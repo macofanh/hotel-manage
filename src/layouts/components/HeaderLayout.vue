@@ -33,7 +33,7 @@ const goHome = () => {
                 <span
                     class="material-icons-outlined text-primary text-3xl group-hover:scale-110 transition-transform"
                 >
-                    apartment
+                    hotel
                 </span>
                 <h2
                     class="text-gray-900 font-extrabold text-2xl leading-tight tracking-tight uppercase"
@@ -47,19 +47,18 @@ const goHome = () => {
                     <a
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Khách sạn</a
+                        >Trang chủ</a
                     >
                     <a
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Khu nghỉ dưỡng</a
+                        >Phòng</a
                     >
                     <a
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Ưu đãi</a
+                        >Dịch vụ</a
                     >
-
                     <a
                         v-if="isLoggedIn"
                         class="text-sm font-semibold text-primary hover:text-orange-600 transition-colors"

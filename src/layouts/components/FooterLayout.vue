@@ -10,7 +10,7 @@
                     <div class="flex items-center gap-2 mb-4">
                         <span
                             class="material-icons-outlined text-primary text-3xl"
-                            >apartment</span
+                            >hotel</span
                         >
                         <h2
                             class="text-gray-900 font-extrabold text-xl uppercase tracking-tight"
@@ -136,14 +136,10 @@
                     © 2026 MacHotel Inc. Mọi quyền được bảo lưu.
                 </p>
                 <div class="flex gap-6">
-                    <a
-                        href="#"
-                        class="text-xs text-gray-400 hover:text-primary"
+                    <a href="#" class="text-xs text-gray-400 hover:text-primary"
                         >Chính sách bảo mật</a
                     >
-                    <a
-                        href="#"
-                        class="text-xs text-gray-400 hover:text-primary"
+                    <a href="#" class="text-xs text-gray-400 hover:text-primary"
                         >Điều khoản sử dụng</a
                     >
                 </div>

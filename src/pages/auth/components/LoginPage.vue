@@ -33,14 +33,16 @@ const handleLogin = async () => {
 </script>
 
 <template>
-    <div class="bg-[#F8FAFC] min-h-screen flex items-center justify-center p-4">
+    <div
+        class="bg-[#F8FAFC] min-h-screen flex items-start justify-center p-4 px-5"
+    >
         <div class="w-full max-w-[380px]">
             <div class="text-center mb-6">
                 <div
                     class="inline-flex items-center justify-center w-14 h-14 bg-white rounded-2xl shadow-sm border border-gray-100 mb-4"
                 >
                     <span class="material-icons-outlined text-primary text-3xl"
-                        >apartment</span
+                        >hotel</span
                     >
                 </div>
                 <h1
@@ -128,20 +130,23 @@ const handleLogin = async () => {
                                 type="checkbox"
                                 class="peer sr-only"
                             />
+
                             <div
-                                class="w-4 h-4 bg-gray-100 border-2 border-gray-200 rounded peer-checked:bg-primary peer-checked:border-primary transition-all"
-                            ></div>
+                                class="relative w-4 h-4 bg-gray-100 border-2 border-gray-200 rounded peer-checked:bg-primary peer-checked:border-primary transition-all"
+                            >
+                                <div
+                                    class="absolute inset-0 flex items-center justify-center scale-0 peer-checked:scale-100 transition-transform duration-200"
+                                >
+                                    <div
+                                        class="w-2 h-2 bg-white rounded-full"
+                                    ></div>
+                                </div>
+                            </div>
+
                             <span
                                 class="ml-2.5 text-xs font-semibold text-gray-600"
-                                >Duy trì đăng nhập</span
                             >
-                            <span
-                                class="absolute text-white opacity-0 peer-checked:opacity-100 left-0.5 transition-opacity"
-                            >
-                                <span
-                                    class="material-icons-outlined text-[12px] font-bold"
-                                    >check</span
-                                >
+                                Duy trì đăng nhập
                             </span>
                         </label>
                     </div>
