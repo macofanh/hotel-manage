@@ -1,54 +1,114 @@
-<script setup></script>
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/pages/auth/useAuth'
+
+const router = useRouter()
+const { isLoggedIn, currentUser, logout } = useAuth()
+
+const goToLogin = () => {
+    router.push({ name: 'login' })
+}
+
+const handleLogout = () => {
+    logout()
+    router.push({ name: 'home' })
+}
+
+const goHome = () => {
+    router.push({ name: 'home' })
+}
+</script>
 
 <template>
-    <div class="layout-content-container flex flex-col w-full">
+    <div
+        class="layout-content-container flex flex-col w-full sticky top-0 z-50"
+    >
         <header
-            class="flex items-center justify-between whitespace-nowrap px-10 py-3"
+            class="flex items-center justify-between whitespace-nowrap px-10 py-4 bg-white shadow-sm border-b border-gray-100"
         >
             <div
-                class="flex items-center gap-4 text-[#181510] dark:text-[#f8f7f5]"
+                @click="goHome"
+                class="flex items-center gap-2 cursor-pointer group"
             >
-                <h2 class="text-black font-bold leading-tight tracking-[-0.015em]">
-                    MacHotel
+                <span
+                    class="material-icons-outlined text-primary text-3xl group-hover:scale-110 transition-transform"
+                >
+                    apartment
+                </span>
+                <h2
+                    class="text-gray-900 font-extrabold text-2xl leading-tight tracking-tight uppercase"
+                >
+                    Mac<span class="text-primary">Hotel</span>
                 </h2>
             </div>
-            <div class="flex flex-1 justify-end gap-8">
-                <div class="hidden md:flex items-center gap-9">
+
+            <div class="flex flex-1 justify-end gap-8 items-center">
+                <nav class="hidden md:flex items-center gap-8">
                     <a
-                        class="text-sm font-medium leading-normal hover:text-primary transition-colors"
+                        class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Hotels</a
+                        >Khách sạn</a
                     >
                     <a
-                        class="text-sm font-medium leading-normal hover:text-primary transition-colors"
+                        class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Resorts</a
+                        >Khu nghỉ dưỡng</a
                     >
                     <a
-                        class="text-sm font-medium leading-normal hover:text-primary transition-colors"
+                        class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
                         href="#"
-                        >Offers</a
+                        >Ưu đãi</a
                     >
+
                     <a
-                        class="text-sm font-medium leading-normal hover:text-primary transition-colors"
+                        v-if="isLoggedIn"
+                        class="text-sm font-semibold text-primary hover:text-orange-600 transition-colors"
                         href="#"
-                        >My Bookings</a
+                        >Đơn đặt phòng</a
                     >
-                </div>
-                <button
-                    class="flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-orange-400 text-white text-sm font-bold leading-normal tracking-[0.015em]"
-                >
-                    <span class="truncate">Log Out</span>
-                </button>
-                <div
-                    class="bg-center cursor-pointer bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-[#e7e2da]"
-                    style="
-                        background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBtIc-oYiCcM-uI4I_pMIJ3NqN_3Yxv-MMaNt89-NaGNXjEEELnYXevQf6ieMhBGNhfSks7izRinfiERWB520EWTPOd6S5Rsk3ji28SbN_ao4-Qcy03e3HU4oJogtMp9oWt7oJO-1-60pWP5XdkJMRZzeEmRlgltlgSZevvjtY_0BsP3wa6i_Xs3RPrI0Dx1Ra6eHr6qLzUYKUE0sqs05c4Dm-3UNNEysZLAj8uErqF77rNRo1ClN1oiM6P90TJOPPF2C9uVZ6V1JI');
-                    "
-                ></div>
+                </nav>
+
+                <div class="h-6 w-px bg-gray-500 hidden md:block"></div>
+
+                <template v-if="!isLoggedIn">
+                    <button
+                        @click="goToLogin"
+                        class="flex cursor-pointer items-center justify-center rounded-full h-10 px-6 bg-primary text-white text-sm font-bold shadow-md hover:bg-orange-600 hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                    >
+                        <span class="truncate">Đăng nhập</span>
+                    </button>
+                </template>
+
+                <template v-else>
+                    <div class="flex items-center gap-4">
+                        <button
+                            @click="handleLogout"
+                            class="flex cursor-pointer items-center justify-center rounded-full h-9 px-5 bg-gray-100 text-gray-600 text-sm font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
+                        >
+                            <span class="truncate">Đăng xuất</span>
+                        </button>
+
+                        <div
+                            class="flex items-center justify-center cursor-pointer rounded-full size-10 bg-gray-100 border-2 border-transparent hover:border-orange-400 shadow-sm transition-all overflow-hidden group"
+                            title="Hồ sơ của tôi"
+                        >
+                            <img
+                                v-if="currentUser?.avatar"
+                                :src="currentUser.avatar"
+                                alt="Avatar"
+                                class="w-full h-full object-cover"
+                            />
+
+                            <span
+                                v-else
+                                class="material-icons-outlined text-gray-400 group-hover:text-primary text-[26px] transition-colors"
+                            >
+                                person
+                            </span>
+                        </div>
+                    </div>
+                </template>
             </div>
         </header>
     </div>
 </template>
-
-<style lang="scss" scoped></style>

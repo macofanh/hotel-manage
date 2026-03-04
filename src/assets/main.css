@@ -1,1 +1,19 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@theme {
+    --color-primary: #fea116;
+    --color-background-light: #f1f8ff;
+    --color-background-dark: #0f172b;
+    --color-card-dark: #1a202e;
+    --color-text-dark-muted: #a1a1aa;
+}
+
+body {
+    font-family: 'Heebo', sans-serif;
+}
+h1,
+h2,
+h3,
+.font-display {
+    font-family: 'Montserrat', sans-serif;
+}
