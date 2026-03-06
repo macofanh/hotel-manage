@@ -1,35 +1,41 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-// Nhận ID từ URL
 const props = defineProps<{
     id: string
 }>()
 
 const router = useRouter()
 
-// 1. DỮ LIỆU FORM (Điền sẵn tên bạn)
-const form = reactive({
-    fullName: 'Tuấn Anh',
-    email: 'tuananh@example.com',
-    phone: '0123 456 789',
-    arrivalTime: 'Tôi chưa rõ',
-    requests: '',
-    terms: false,
-})
-
-// 2. BIẾN TRẠNG THÁI VÀ DỮ LIỆU PHÒNG
 const isLoading = ref(true)
-const isSubmitting = ref(false)
 const room = ref<any>(null)
 
-// 3. FAKE API LẤY THÔNG TIN PHÒNG
+const timeLeft = ref(15 * 60)
+let timerId: ReturnType<typeof setInterval> | null = null
+
+const formattedTime = computed(() => {
+    const minutes = Math.floor(timeLeft.value / 60)
+        .toString()
+        .padStart(2, '0')
+    const seconds = (timeLeft.value % 60).toString().padStart(2, '0')
+    return `${minutes}:${seconds}`
+})
+
+
 onMounted(async () => {
+    // Bắt đầu đếm ngược
+    timerId = setInterval(() => {
+        if (timeLeft.value > 0) {
+            timeLeft.value--
+        } else if (timerId) {
+            clearInterval(timerId)
+        }
+    }, 1000)
+
     // Giả lập thời gian tải API
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    // Tạo ID mặc định nếu URL bị thiếu
     const roomId = props.id || '1'
 
     room.value = {
@@ -55,29 +61,20 @@ onMounted(async () => {
     isLoading.value = false
 })
 
-// 4. HÀM XỬ LÝ ĐẶT PHÒNG DUY NHẤT
-const handleCompleteBooking = async () => {
-    // Kiểm tra đã tick ô điều khoản chưa
-    if (!form.terms) {
-        alert('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật!')
-        return
-    }
+// Xóa timer khi rời khỏi trang để tránh rò rỉ bộ nhớ
+onUnmounted(() => {
+    if (timerId) clearInterval(timerId)
+})
 
-    isSubmitting.value = true
-    try {
-        // Xoay loading 1 giây cho giao diện mượt mà
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+// CÁC HÀM XỬ LÝ NÚT BẤM
+const handlePaymentSuccess = () => {
+    alert('Thanh toán thành công! Cảm ơn bạn đã đặt phòng.')
+    router.push({ name: 'my-bookings' })
+}
 
-        // Chuyển hướng sang trang quét mã QR, đảm bảo luôn có ID
-        router.push({ name: 'booking-complete', params: { id: room.value.id } })
-    } catch (error) {
-        console.error('Lỗi chuyển trang:', error)
-        alert(
-            'Có lỗi xảy ra: Không tìm thấy đường dẫn chuyển trang. Vui lòng kiểm tra lại cấu hình file router/index.ts',
-        )
-    } finally {
-        isSubmitting.value = false
-    }
+const handleGoBack = () => {
+    // Quay lại trang nhập thông tin kèm theo ID phòng hiện tại
+    router.push({ name: 'booking', params: { id: props.id } })
 }
 </script>
 
@@ -108,7 +105,7 @@ const handleCompleteBooking = async () => {
                     ></path>
                 </svg>
                 <span class="text-gray-500 font-medium"
-                    >Đang chuẩn bị đơn đặt phòng...</span
+                    >Đang khởi tạo cổng thanh toán...</span
                 >
             </div>
         </div>
@@ -136,128 +133,208 @@ const handleCompleteBooking = async () => {
                 </div>
 
                 <div class="flex flex-wrap justify-between gap-3 py-6">
-                    <div class="flex flex-col gap-2">
+                    <div class="flex min-w-72 flex-col gap-2">
                         <p
                             class="text-[#181510] text-4xl font-black leading-tight tracking-[-0.033em]"
                         >
-                            Kiểm tra thông tin
+                            Thanh toán
                         </p>
                         <p class="text-[#8d7a5e] text-lg font-medium">
-                            Vui lòng điền thông tin của bạn để xác nhận yêu cầu
-                            đặt phòng.
+                            Quét mã QR để hoàn tất thanh toán và giữ phòng của
+                            bạn.
                         </p>
                     </div>
                 </div>
 
-                <form
-                    @submit.prevent="handleCompleteBooking"
-                    class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4"
-                >
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4">
                     <div class="lg:col-span-2 flex flex-col gap-6">
                         <div
                             class="bg-white rounded-2xl p-8 shadow-sm border border-[#e7e2da]"
                         >
-                            <h3 class="text-[#181510] text-2xl font-bold mb-6">
-                                Thông tin liên hệ
-                            </h3>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Họ và tên</label
+                            <div class="flex items-center justify-between mb-8">
+                                <div class="flex flex-col">
+                                    <h3
+                                        class="text-[#181510] text-2xl font-bold leading-tight"
                                     >
-                                    <input
-                                        v-model="form.fullName"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                        type="text"
-                                        required
+                                        Thanh toán qua mã QR
+                                    </h3>
+                                    <p class="text-[#8d7a5e] text-sm">
+                                        Xác nhận tự động thông qua cổng thanh
+                                        toán
+                                    </p>
+                                </div>
+                                <div
+                                    class="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-sm font-bold"
+                                >
+                                    <span
+                                        class="material-symbols-outlined text-base"
+                                        >verified_user</span
+                                    >
+                                    Giao dịch an toàn
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex flex-col items-center justify-center py-6 bg-[#fcfbf9] rounded-2xl border-2 border-dashed border-[#e7e2da]"
+                            >
+                                <div
+                                    class="relative bg-white p-6 rounded-2xl shadow-xl border border-[#e7e2da] mb-6"
+                                >
+                                    <div
+                                        class="absolute -top-3 -left-3 bg-primary text-white p-2 rounded-lg shadow-lg"
+                                    >
+                                        <span class="material-symbols-outlined"
+                                            >qr_code_2</span
+                                        >
+                                    </div>
+                                    <img
+                                        alt="Payment QR Code"
+                                        class="w-[200px] h-[200px] md:w-[250px] md:h-[250px]"
+                                        src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=ThanhToanMacHotel"
                                     />
-                                </div>
-
-                                <div class="flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Địa chỉ Email</label
+                                    <div
+                                        class="absolute inset-0 flex items-center justify-center pointer-events-none"
                                     >
-                                    <input
-                                        v-model="form.email"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                        type="email"
-                                        required
-                                    />
-                                </div>
-
-                                <div class="flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Số điện thoại</label
-                                    >
-                                    <input
-                                        v-model="form.phone"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                        type="tel"
-                                        required
-                                    />
-                                </div>
-
-                                <div class="flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Thời gian đến dự kiến (Tùy chọn)</label
-                                    >
-                                    <select
-                                        v-model="form.arrivalTime"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                    >
-                                        <option>Tôi chưa rõ</option>
-                                        <option>12:00 PM - 2:00 PM</option>
-                                        <option>2:00 PM - 4:00 PM</option>
-                                        <option>4:00 PM - 6:00 PM</option>
-                                    </select>
-                                </div>
-
-                                <div class="md:col-span-2 flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Yêu cầu đặc biệt</label
-                                    >
-                                    <textarea
-                                        v-model="form.requests"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary text-sm font-medium resize-none"
-                                        placeholder="Thêm khăn tắm, phòng yên tĩnh..."
-                                        rows="4"
-                                    ></textarea>
+                                        <div
+                                            class="bg-white p-1.5 rounded-md border shadow-sm"
+                                        >
+                                            <span
+                                                class="material-symbols-outlined text-primary text-2xl"
+                                                >apartment</span
+                                            >
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div
-                                    class="md:col-span-2 flex items-start gap-3 pt-4"
+                                    class="text-center space-y-4 max-w-sm px-4"
                                 >
-                                    <input
-                                        v-model="form.terms"
-                                        class="mt-1 rounded border-[#e7e2da] text-primary focus:ring-primary cursor-pointer w-4 h-4"
-                                        id="terms"
-                                        type="checkbox"
-                                    />
-                                    <label
-                                        class="text-sm text-[#8d7a5e] font-medium cursor-pointer"
-                                        for="terms"
-                                    >
-                                        Tôi đồng ý với
-                                        <a
-                                            class="text-primary font-bold hover:underline"
-                                            href="#"
-                                            >Điều khoản dịch vụ</a
+                                    <div class="space-y-1">
+                                        <p
+                                            class="text-3xl font-black text-primary"
                                         >
-                                        và
-                                        <a
-                                            class="text-primary font-bold hover:underline"
-                                            href="#"
-                                            >Chính sách bảo mật</a
-                                        >.
-                                    </label>
+                                            ${{
+                                                (
+                                                    room.pricePerNight *
+                                                        room.nights +
+                                                    room.serviceFee +
+                                                    room.tax
+                                                ).toFixed(2)
+                                            }}
+                                        </p>
+                                        <p
+                                            class="text-[#8d7a5e] text-xs font-bold uppercase tracking-widest"
+                                        >
+                                            Số tiền cần thanh toán
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="p-4 bg-white rounded-xl border border-[#e7e2da]"
+                                    >
+                                        <p
+                                            class="text-[#181510] text-sm font-bold mb-1"
+                                        >
+                                            Mở ứng dụng ngân hàng để quét mã
+                                        </p>
+                                        <p class="text-[#8d7a5e] text-xs">
+                                            Hỗ trợ tất cả ứng dụng Mobile
+                                            Banking và Ví điện tử
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-center gap-2 text-red-500 font-bold text-sm bg-red-50 py-2 px-4 rounded-full"
+                                    >
+                                        <span
+                                            class="material-symbols-outlined text-base"
+                                            >timer</span
+                                        >
+                                        <span
+                                            >Mã hết hạn sau:
+                                            <span class="font-mono text-base">{{
+                                                formattedTime
+                                            }}</span></span
+                                        >
+                                    </div>
+
+                                    <button
+                                        @click="handlePaymentSuccess"
+                                        class="mt-4 px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg hover:bg-gray-800 transition-colors"
+                                    >
+                                        [Dev] Giả lập thanh toán thành công
+                                    </button>
                                 </div>
                             </div>
+
+                            <div
+                                class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4"
+                            >
+                                <div
+                                    class="flex items-center gap-3 p-3 rounded-lg border border-[#e7e2da]"
+                                >
+                                    <span
+                                        class="material-symbols-outlined text-primary text-2xl"
+                                        >smartphone</span
+                                    >
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold"
+                                            >Mở ứng dụng</span
+                                        >
+                                        <span class="text-[10px] text-[#8d7a5e]"
+                                            >Mở App ngân hàng/Ví</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="flex items-center gap-3 p-3 rounded-lg border border-[#e7e2da]"
+                                >
+                                    <span
+                                        class="material-symbols-outlined text-primary text-2xl"
+                                        >photo_camera</span
+                                    >
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold"
+                                            >Quét mã QR</span
+                                        >
+                                        <span class="text-[10px] text-[#8d7a5e]"
+                                            >Hướng camera vào mã</span
+                                        >
+                                    </div>
+                                </div>
+                                <div
+                                    class="flex items-center gap-3 p-3 rounded-lg border border-[#e7e2da]"
+                                >
+                                    <span
+                                        class="material-symbols-outlined text-primary text-2xl"
+                                        >check_circle</span
+                                    >
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold"
+                                            >Xác nhận</span
+                                        >
+                                        <span class="text-[10px] text-[#8d7a5e]"
+                                            >Thanh toán & hoàn tất</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between px-2">
+                            <button
+                                @click="handleGoBack"
+                                class="text-[#8d7a5e] text-sm font-bold flex items-center gap-2 hover:text-primary transition-colors"
+                            >
+                                <span
+                                    class="material-symbols-outlined text-base"
+                                    >arrow_back</span
+                                >
+                                Quay lại trang nhập thông tin
+                            </button>
+                            <button
+                                class="text-primary text-sm font-bold hover:underline"
+                            >
+                                Chọn phương thức khác
+                            </button>
                         </div>
                     </div>
 
@@ -416,57 +493,21 @@ const handleCompleteBooking = async () => {
                                     </div>
                                 </div>
 
-                                <button
-                                    type="submit"
-                                    :disabled="isSubmitting"
-                                    class="w-full bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl mt-6 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
+                                <div class="pt-6">
                                     <div
-                                        v-if="isSubmitting"
-                                        class="flex items-center gap-2"
+                                        class="flex items-center gap-2 text-[10px] text-[#8d7a5e] justify-center uppercase tracking-widest font-bold"
                                     >
-                                        <svg
-                                            class="animate-spin h-5 w-5 text-white"
-                                            viewBox="0 0 24 24"
+                                        <span
+                                            class="material-symbols-outlined text-sm"
+                                            >shield</span
                                         >
-                                            <circle
-                                                class="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                stroke-width="4"
-                                                fill="none"
-                                            ></circle>
-                                            <path
-                                                class="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                        <span>Đang xử lý...</span>
+                                        Mã hóa & Bảo mật 100%
                                     </div>
-                                    <template v-else>
-                                        <span>Xác nhận đặt phòng</span>
-                                        <span class="material-symbols-outlined"
-                                            >check_circle</span
-                                        >
-                                    </template>
-                                </button>
-
-                                <p
-                                    class="text-center text-[10px] text-[#8d7a5e] mt-4 uppercase tracking-widest font-bold"
-                                >
-                                    <span
-                                        class="material-symbols-outlined text-xs align-middle"
-                                        >lock</span
-                                    >
-                                    Thanh toán bảo mật
-                                </p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>

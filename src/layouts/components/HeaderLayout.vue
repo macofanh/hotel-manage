@@ -17,6 +17,22 @@ const handleLogout = () => {
 const goHome = () => {
     router.push({ name: 'home' })
 }
+
+const gotoRoomPage = () => {
+    router.push({ name: 'room' })
+}
+
+const gotoServicePage = () => {
+    router.push({ name: 'service' })
+}
+
+const gotoBookingHistory = () => {
+    router.push({ name: 'my-bookings' })
+}
+
+const gotoProfileInfo = () => {
+    router.push({ name: 'profile' })
+}
 </script>
 
 <template>
@@ -44,27 +60,31 @@ const goHome = () => {
 
             <div class="flex flex-1 justify-end gap-8 items-center">
                 <nav class="hidden md:flex items-center gap-8">
-                    <a
+                    <button
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
-                        href="#"
-                        >Trang chủ</a
+                        @click="goHome"
                     >
-                    <a
+                        Trang chủ
+                    </button>
+                    <button
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
-                        href="#"
-                        >Phòng</a
+                        @click="gotoRoomPage"
                     >
-                    <a
+                        Phòng
+                    </button>
+                    <button
                         class="text-sm font-semibold text-gray-600 hover:text-primary transition-colors"
-                        href="#"
-                        >Dịch vụ</a
+                        @click="gotoServicePage"
                     >
-                    <a
+                        Dịch vụ
+                    </button>
+                    <button
                         v-if="isLoggedIn"
                         class="text-sm font-semibold text-primary hover:text-orange-600 transition-colors"
-                        href="#"
-                        >Đơn đặt phòng</a
+                        @click="gotoBookingHistory"
                     >
+                        Đơn đặt phòng
+                    </button>
                 </nav>
 
                 <div class="h-6 w-px bg-gray-500 hidden md:block"></div>
@@ -87,24 +107,26 @@ const goHome = () => {
                             <span class="truncate">Đăng xuất</span>
                         </button>
 
-                        <div
-                            class="flex items-center justify-center cursor-pointer rounded-full size-10 bg-gray-100 border-2 border-transparent hover:border-orange-400 shadow-sm transition-all overflow-hidden group"
-                            title="Hồ sơ của tôi"
-                        >
-                            <img
-                                v-if="currentUser?.avatar"
-                                :src="currentUser.avatar"
-                                alt="Avatar"
-                                class="w-full h-full object-cover"
-                            />
-
-                            <span
-                                v-else
-                                class="material-icons-outlined text-gray-400 group-hover:text-primary text-[26px] transition-colors"
+                        <button @click="gotoProfileInfo">
+                            <div
+                                class="flex items-center justify-center cursor-pointer rounded-full size-10 bg-gray-100 border-2 border-transparent hover:border-orange-400 shadow-sm transition-all overflow-hidden group"
+                                title="Hồ sơ của tôi"
                             >
-                                person
-                            </span>
-                        </div>
+                                <img
+                                    v-if="currentUser?.avatar"
+                                    :src="currentUser.avatar"
+                                    alt="Avatar"
+                                    class="w-full h-full object-cover"
+                                />
+
+                                <span
+                                    v-else
+                                    class="material-icons-outlined text-gray-400 group-hover:text-primary text-[26px] transition-colors"
+                                >
+                                    person
+                                </span>
+                            </div>
+                        </button>
                     </div>
                 </template>
             </div>

@@ -41,23 +41,47 @@ const routes: Array<RouteRecordRaw> = [
                 component: () => import('@/pages/room/RoomPage.vue'),
             },
             {
+                name: 'room-detail',
+                path: 'room-detail/:id',
+                props: true,
+                component: () => import('@/pages/room/RoomDetail.vue'),
+            },
+            {
+                name: 'service',
+                path: 'service',
+                component: () => import('@/pages/service/ServicePage.vue'),
+            },
+            {
                 name: 'booking',
                 path: 'booking',
                 component: () => import('@/pages/booking/BookingPage.vue'),
-                meta: { requiresAuth: true }, // Phải đăng nhập mới được đặt phòng
+                meta: { requiresAuth: true },
+            },
+            {
+                name: 'booking-complete',
+                path: 'booking/:id/complete',
+                props: true,
+                component: () => import('@/pages/booking/BookingComplete.vue'),
+                meta: { requiresAuth: true },
             },
             {
                 name: 'profile',
                 path: 'profile',
                 // component: () => import('@/pages/profile/ProfileLayout.vue'),
                 redirect: { name: 'info' },
-                meta: { requiresAuth: true }, // Phải đăng nhập mới xem được hồ sơ
+                meta: { requiresAuth: true },
                 children: [
                     {
                         name: 'info',
                         path: 'info',
                         component: () =>
                             import('@/pages/profile/ProfileInfo.vue'),
+                    },
+                    {
+                        name: 'my-bookings',
+                        path: 'my-bookings',
+                        component: () =>
+                            import('@/pages/profile/BookingHistory.vue'),
                     },
                 ],
             },
@@ -71,20 +95,16 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-    // Giả sử bạn lưu token trong localStorage khi đăng nhập thành công
     const isAuthenticated = !!localStorage.getItem('access_token')
 
-    // Nếu trang yêu cầu đăng nhập (requiresAuth) mà chưa có token
     if (to.meta.requiresAuth && !isAuthenticated) {
         // Đá về trang đăng nhập
         next({ name: 'login' })
     }
-    // Nếu đã đăng nhập rồi mà còn cố tình vào trang login/register
     else if (to.path.startsWith('/auth') && isAuthenticated) {
-        // Đá về trang chủ
         next({ name: 'home' })
     }
-    // Các trường hợp khác cho qua bình thường
+
     else {
         next()
     }
