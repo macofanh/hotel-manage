@@ -1,41 +1,30 @@
-// src/common/services/auth.service.ts
+// src/pages/auth/authService.ts
+import httpClient from '@/api/axiosClient'
+import { API_ENDPOINTS } from '@/api/endPoints'
+import type {
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+} from './authTypes'
 
 export const authService = {
-    // Hàm đăng nhập (Fake API)
-    async login(credentials: any) {
-        // 1. Giả lập độ trễ của mạng (1.5 giây)
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+    async login(payload: LoginRequest): Promise<TokenResponse> {
+        // Gửi thẳng cục payload (JSON) như bình thường!
+        return httpClient.post<any, TokenResponse>(
+            API_ENDPOINTS.AUTH.LOGIN,
+            payload
+        )
+    },
 
-        // 2. Giả lập logic kiểm tra ở Backend
-        // (Giả sử cứ nhập email có chữ 'admin' thì thành công)
-        if (credentials.identifier.includes('admin')) {
-            return {
-                status: 200,
-                message: 'Đăng nhập thành công',
-                data: {
-                    access_token: 'fake-jwt-token-xyz-123456789',
-                    user: {
-                        id: 1,
-                        username: 'tuananh_admin',
-                        fullName: 'Tuấn Anh', // Dữ liệu giả trả về để hiển thị lên Header
-                        role: 'admin',
-                        avatar: 'https://ui-avatars.com/api/?name=Tuan+Anh&background=FEA116&color=fff',
-                    },
-                },
-            }
-        } else {
-            throw new Error('Tài khoản hoặc mật khẩu không chính xác!')
-        }
+    async register(payload: RegisterRequest): Promise<UserResponse> {
+        return httpClient.post<any, UserResponse>(
+            API_ENDPOINTS.AUTH.REGISTER,
+            payload,
+        )
+    },
 
-        /* =========================================================
-       TODO: KHI NÀO CÓ BE, HÃY XÓA ĐOẠN FAKE TRÊN VÀ BỎ COMMENT ĐOẠN DƯỚI
-       =========================================================
-       try {
-         const response = await httpClient.post('/api/auth/login', credentials);
-         return response.data;
-       } catch (error) {
-         throw error;
-       }
-    */
+    async getMe(): Promise<UserResponse> {
+        return httpClient.get<any, UserResponse>(API_ENDPOINTS.PROFILE.GET)
     },
 }

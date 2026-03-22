@@ -2,30 +2,63 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../useAuth'
+import { authService } from '../authService'
 
 const router = useRouter()
 const { login } = useAuth()
 
 const form = reactive({
-    identifier: '',
+    username: '',
     password: '',
     rememberMe: false,
 })
 
 const isLoading = ref(false)
+const errorMessage = ref('')
 
 const handleLogin = async () => {
     isLoading.value = true
+    errorMessage.value = ''
+
     try {
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-        const userData = {
-            fullName: 'Tuấn Anh',
-            avatar: null,
+        const response: any = await authService.login({
+            username: form.username,
+            password: form.password,
+        })
+
+        // Lấy token an toàn (phòng hờ BE trả về access_token, token, hoặc nằm trong data)
+        const token =
+            response.access_token ||
+            response.token ||
+            response.data?.access_token
+
+        if (!token) {
+            throw new Error('Không nhận được Token từ hệ thống!')
         }
-        login('fake-jwt-token-123', userData)
+
+        // 2. Lưu token trước để axiosClient tự gắn vào header cho bước tiếp theo
+        localStorage.setItem('access_token', token)
+
+        // 3. Gọi API lấy thông tin đầy đủ của user (Lúc này axiosClient đã tự nhét token vào rồi)
+        const user = await authService.getMe()
+
+        // 4. Lưu vào state + localStorage qua composable
+        login(token, {
+            user_id: user.user_id,
+            username: user.username,
+            full_name: user.full_name,
+            email: user.email,
+            role: user.role,
+        })
+
+        // 5. Chuyển hướng về trang chủ
         router.push({ name: 'home' })
-    } catch (error) {
-        console.error(error)
+    } catch (error: any) {
+        localStorage.removeItem('access_token')
+        errorMessage.value =
+            error?.response?.data?.detail ??
+            error.message ??
+            'Đăng nhập thất bại, vui lòng thử lại!'
     } finally {
         isLoading.value = false
     }
@@ -60,11 +93,18 @@ const handleLogin = async () => {
             >
                 <h2 class="text-xl font-bold text-gray-800 mb-6">Đăng nhập</h2>
 
+                <div
+                    v-if="errorMessage"
+                    class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-600"
+                >
+                    {{ errorMessage }}
+                </div>
+
                 <form @submit.prevent="handleLogin" class="space-y-4">
                     <div class="space-y-1.5">
                         <label
                             class="text-xs font-bold text-gray-700 ml-1"
-                            for="identifier"
+                            for="username"
                         >
                             Tài khoản
                         </label>
@@ -78,11 +118,11 @@ const handleLogin = async () => {
                                 >
                             </div>
                             <input
-                                v-model="form.identifier"
-                                id="identifier"
+                                v-model="form.username"
+                                id="username"
                                 type="text"
                                 required
-                                placeholder="Nhập email của bạn"
+                                placeholder="Nhập tên đăng nhập của bạn"
                                 class="block w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all"
                             />
                         </div>
@@ -93,13 +133,15 @@ const handleLogin = async () => {
                             <label
                                 class="text-xs font-bold text-gray-700"
                                 for="password"
-                                >Mật khẩu</label
                             >
+                                Mật khẩu
+                            </label>
                             <a
                                 href="#"
                                 class="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter"
-                                >Quên mật khẩu?</a
                             >
+                                Quên mật khẩu?
+                            </a>
                         </div>
                         <div class="group relative">
                             <div
@@ -130,7 +172,6 @@ const handleLogin = async () => {
                                 type="checkbox"
                                 class="peer sr-only"
                             />
-
                             <div
                                 class="relative w-4 h-4 bg-gray-100 border-2 border-gray-200 rounded peer-checked:bg-primary peer-checked:border-primary transition-all"
                             >
@@ -142,7 +183,6 @@ const handleLogin = async () => {
                                     ></div>
                                 </div>
                             </div>
-
                             <span
                                 class="ml-2.5 text-xs font-semibold text-gray-600"
                             >
@@ -169,12 +209,12 @@ const handleLogin = async () => {
                                     stroke="currentColor"
                                     stroke-width="4"
                                     fill="none"
-                                ></circle>
+                                />
                                 <path
                                     class="opacity-75"
                                     fill="currentColor"
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                ></path>
+                                />
                             </svg>
                             <span>Đang xử lý...</span>
                         </div>
