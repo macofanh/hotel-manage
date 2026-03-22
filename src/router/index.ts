@@ -81,7 +81,7 @@ const routes: Array<RouteRecordRaw> = [
                         name: 'my-bookings',
                         path: 'my-bookings',
                         component: () =>
-                            import('@/pages/profile/BookingHistory.vue'),
+                            import('@/pages/booking/BookingHistory.vue'),
                     },
                 ],
             },

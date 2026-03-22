@@ -10,21 +10,28 @@ import type {
 
 export const authService = {
     async login(payload: LoginRequest): Promise<TokenResponse> {
-        // Gửi thẳng cục payload (JSON) như bình thường!
-        return httpClient.post<any, TokenResponse>(
+        // Gọi API và hứng toàn bộ gói hàng vào biến response
+        const response = await httpClient.post(
             API_ENDPOINTS.AUTH.LOGIN,
-            payload
+            payload,
         )
+        // Trả về đúng cái lõi data chứa Token
+        return response.data
     },
 
     async register(payload: RegisterRequest): Promise<UserResponse> {
-        return httpClient.post<any, UserResponse>(
+        const response = await httpClient.post(
             API_ENDPOINTS.AUTH.REGISTER,
             payload,
         )
+        // Trả về đúng lõi data chứa thông tin User vừa đăng ký
+        return response.data
     },
 
+    // Lấy thông tin user hiện tại
     async getMe(): Promise<UserResponse> {
-        return httpClient.get<any, UserResponse>(API_ENDPOINTS.PROFILE.GET)
+        const response = await httpClient.get(API_ENDPOINTS.PROFILE.GET)
+        // Trả về đúng lõi data (chứa full_name, role...) để LocalStorage lưu cho chuẩn
+        return response.data
     },
 }

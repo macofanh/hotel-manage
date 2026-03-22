@@ -3,35 +3,27 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/pages/auth/useAuth'
 
 const router = useRouter()
+// Lấy các state và hàm từ useAuth
 const { isLoggedIn, currentUser, logout } = useAuth()
 
-const goToLogin = () => {
-    router.push({ name: 'login' })
-}
+// Các hàm điều hướng
+const goToLogin = () => router.push({ name: 'login' })
+const goHome = () => router.push({ name: 'home' })
+const gotoRoomPage = () => router.push({ name: 'room' })
+const gotoServicePage = () => router.push({ name: 'service' })
+const gotoBookingHistory = () => router.push({ name: 'my-bookings' })
+const gotoProfileInfo = () => router.push({ name: 'profile' })
 
+// Hàm xử lý đăng xuất
 const handleLogout = () => {
+    // 1. Xóa token và user_info trong localStorage
     logout()
-    router.push({ name: 'home' })
-}
-
-const goHome = () => {
-    router.push({ name: 'home' })
-}
-
-const gotoRoomPage = () => {
-    router.push({ name: 'room' })
-}
-
-const gotoServicePage = () => {
-    router.push({ name: 'service' })
-}
-
-const gotoBookingHistory = () => {
-    router.push({ name: 'my-bookings' })
-}
-
-const gotoProfileInfo = () => {
-    router.push({ name: 'profile' })
+    // 2. Thông báo nhẹ nhàng
+    alert('Đăng xuất thành công!')
+    // 3. Đá về trang chủ hoặc reload lại để dọn dẹp state
+    router.push({ name: 'home' }).then(() => {
+        window.location.reload() // Reload để Header cập nhật lại state ngay lập tức
+    })
 }
 </script>
 
@@ -107,21 +99,27 @@ const gotoProfileInfo = () => {
                             <span class="truncate">Đăng xuất</span>
                         </button>
 
-                        <button @click="gotoProfileInfo">
+                        <button @click="gotoProfileInfo" title="Hồ sơ của tôi">
                             <div
-                                class="flex items-center justify-center cursor-pointer rounded-full size-10 bg-gray-100 border-2 border-transparent hover:border-orange-400 shadow-sm transition-all overflow-hidden group"
-                                title="Hồ sơ của tôi"
+                                class="flex items-center justify-center cursor-pointer rounded-full size-10 bg-orange-100 border-2 border-transparent hover:border-primary shadow-sm transition-all overflow-hidden group"
                             >
                                 <img
-                                    v-if="currentUser?.avatar"
-                                    :src="currentUser.avatar"
+                                    v-if="(currentUser as any)?.avatar_url"
+                                    :src="(currentUser as any).avatar_url"
                                     alt="Avatar"
                                     class="w-full h-full object-cover"
                                 />
 
                                 <span
+                                    v-else-if="currentUser?.full_name"
+                                    class="text-primary font-bold text-lg uppercase group-hover:scale-110 transition-transform"
+                                >
+                                    {{ currentUser.full_name.charAt(0) }}
+                                </span>
+
+                                <span
                                     v-else
-                                    class="material-icons-outlined text-gray-400 group-hover:text-primary text-[26px] transition-colors"
+                                    class="material-icons-outlined text-primary text-[24px] group-hover:scale-110 transition-transform"
                                 >
                                     person
                                 </span>
