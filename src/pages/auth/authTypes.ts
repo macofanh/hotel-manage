@@ -28,6 +28,7 @@ export interface UserResponse {
     email: string
     role: 'ADMIN' | 'CUSTOMER'
     created_at: string
+    avatar_url?: string | null
 }
 
 // Thông tin lưu vào localStorage sau khi login
@@ -37,4 +38,5 @@ export interface StoredUser {
     full_name: string
     email: string
     role: 'ADMIN' | 'CUSTOMER'
+    avatar_url?: string | null
 }

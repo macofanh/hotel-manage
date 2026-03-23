@@ -6,11 +6,9 @@ import { useAuth } from '../auth/useAuth'
 import { usePermission } from '@/api/usePermission'
 
 const router = useRouter()
-// Lôi authUser từ LocalStorage ra để mồi dữ liệu cho mượt
-const { logout, currentUser: authUser } = useAuth()
+const { currentUser: authUser } = useAuth()
 const { isAdmin } = usePermission()
 
-// Dữ liệu User
 const currentUser = reactive({
     fullName: '',
     email: '',
@@ -24,9 +22,17 @@ const currentUser = reactive({
 const isSaving = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
-// 1. Gọi API lấy dữ liệu Profile
+// Helper: chuyển relative path thành full URL
+const getFullUrl = (path: string): string => {
+    if (!path) return ''
+    if (path.startsWith('http')) return path
+    const BASE_URL =
+        import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    return `${BASE_URL}${path}`
+}
+
+// 1. Lấy dữ liệu Profile
 const fetchProfile = async () => {
-    // Đổ dữ liệu từ LocalStorage ra trước để user không phải đợi
     if (authUser.value) {
         currentUser.fullName = authUser.value.full_name || ''
         currentUser.email = authUser.value.email || ''
@@ -38,7 +44,7 @@ const fetchProfile = async () => {
         currentUser.fullName = data.full_name || currentUser.fullName
         currentUser.email = data.email || currentUser.email
         currentUser.phone = data.phone_number || ''
-        currentUser.avatar = data.avatar_url || ''
+        currentUser.avatar = getFullUrl(data.avatar_url || '') // ✅ Fix ở đây
 
         if (data.created_at) {
             const date = new Date(data.created_at)
@@ -53,18 +59,27 @@ onMounted(() => {
     fetchProfile()
 })
 
-// 2. Lưu thông tin (Gọi API PUT)
+// 2. Lưu thông tin (PUT /api/profile/)
 const handleSaveProfile = async () => {
     isSaving.value = true
     try {
         await profileService.updateProfile({
             full_name: currentUser.fullName,
             phone_number: currentUser.phone,
-        })
+            avatar_url: currentUser.avatar,
+        } as any)
+
+        if (authUser.value) {
+            authUser.value.full_name = currentUser.fullName
+            authUser.value.avatar_url = currentUser.avatar
+            localStorage.setItem('user_info', JSON.stringify(authUser.value))
+        }
+
         alert('Cập nhật thông tin thành công!')
+        window.location.reload()
     } catch (error) {
         console.error(error)
-        alert('Có lỗi xảy ra!')
+        alert('Có lỗi xảy ra khi lưu thông tin!')
     } finally {
         isSaving.value = false
     }
@@ -79,15 +94,35 @@ const handleFileChange = async (event: Event) => {
     if (!file) return
 
     try {
-        currentUser.avatar = URL.createObjectURL(file)
-        const response = await profileService.uploadAvatar(file)
+        const uploadResponse = await profileService.uploadAvatar(file)
 
-        if (response && response.file_url) {
-            await profileService.updateProfile({
-                avatar_url: response.file_url,
-            } as any)
-            alert('Cập nhật ảnh đại diện thành công!')
+        const rawUrl = uploadResponse.image_url || ''
+
+        if (!rawUrl) {
+            console.error('Dữ liệu BE trả về:', uploadResponse)
+            alert(
+                'Upload thành công nhưng không lấy được link ảnh! Hãy check lại Console (F12).',
+            )
+            return
         }
+
+        const imageUrl = getFullUrl(rawUrl) // ✅ Fix ở đây
+
+        currentUser.avatar = imageUrl
+
+        await profileService.updateProfile({
+            full_name: currentUser.fullName,
+            phone_number: currentUser.phone,
+            avatar_url: rawUrl, // Lưu raw path vào DB, không lưu full URL
+        } as any)
+
+        if (authUser.value) {
+            authUser.value.avatar_url = imageUrl
+            localStorage.setItem('user_info', JSON.stringify(authUser.value))
+        }
+
+        alert('Cập nhật ảnh đại diện thành công!')
+        window.location.reload()
     } catch (error) {
         console.error('Lỗi upload ảnh:', error)
         alert('Tải ảnh lên thất bại.')
@@ -186,20 +221,20 @@ const handleFileChange = async (event: Event) => {
                                 </div>
                             </router-link>
 
-                            <a
+                            <router-link
                                 v-if="isAdmin"
-                                
-                                class="flex items-center gap-3 px-6 py-4 text-orange-600 bg-orange-50/50 hover:bg-orange-100 font-bold transition-colors border-l-4 border-transparent"
+                                :to="{ name: 'admin-overview' }"
+                                class="flex items-center gap-3 px-6 py-4 text-orange-600 bg-orange-50/50 hover:bg-orange-100 font-bold transition-colors border-l-4 border-transparent cursor-pointer"
                             >
                                 <span class="material-icons-outlined"
                                     >admin_panel_settings</span
                                 >
                                 Quản trị hệ thống
-                            </a>
+                            </router-link>
 
                             <a
                                 href="#"
-                                class="flex items-center gap-3 px-6 py-4 text-gray-600 hover:bg-gray-50 hover:text-primary font-medium transition-colors border-l-4 border-transparent"
+                                class="flex items-center gap-3 px-6 py-4 text-gray-600 hover:bg-gray-50 hover:text-primary font-medium transition-colors border-l-4 border-transparent mb-2"
                             >
                                 <span class="material-icons-outlined"
                                     >security</span

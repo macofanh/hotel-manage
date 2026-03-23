@@ -3,10 +3,17 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/pages/auth/useAuth'
 
 const router = useRouter()
-// Lấy các state và hàm từ useAuth
 const { isLoggedIn, currentUser, logout } = useAuth()
 
-// Các hàm điều hướng
+// Helper: chuyển relative path thành full URL
+const getFullUrl = (path: string): string => {
+    if (!path) return ''
+    if (path.startsWith('http')) return path
+    const BASE_URL =
+        import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    return `${BASE_URL}${path}`
+}
+
 const goToLogin = () => router.push({ name: 'login' })
 const goHome = () => router.push({ name: 'home' })
 const gotoRoomPage = () => router.push({ name: 'room' })
@@ -14,15 +21,11 @@ const gotoServicePage = () => router.push({ name: 'service' })
 const gotoBookingHistory = () => router.push({ name: 'my-bookings' })
 const gotoProfileInfo = () => router.push({ name: 'profile' })
 
-// Hàm xử lý đăng xuất
 const handleLogout = () => {
-    // 1. Xóa token và user_info trong localStorage
     logout()
-    // 2. Thông báo nhẹ nhàng
     alert('Đăng xuất thành công!')
-    // 3. Đá về trang chủ hoặc reload lại để dọn dẹp state
     router.push({ name: 'home' }).then(() => {
-        window.location.reload() // Reload để Header cập nhật lại state ngay lập tức
+        window.location.reload()
     })
 }
 </script>
@@ -105,7 +108,11 @@ const handleLogout = () => {
                             >
                                 <img
                                     v-if="(currentUser as any)?.avatar_url"
-                                    :src="(currentUser as any).avatar_url"
+                                    :src="
+                                        getFullUrl(
+                                            (currentUser as any).avatar_url,
+                                        )
+                                    "
                                     alt="Avatar"
                                     class="w-full h-full object-cover"
                                 />
