@@ -191,19 +191,19 @@ const routes: Array<RouteRecordRaw> = [
                         component: () =>
                             import('@/pages/admin/rooms/RoomsAdmin.vue'),
                     },
-                    // {
-                    //     name: 'admin-rooms-create',
-                    //     path: 'create',
-                    //     component: () =>
-                    //         import('@/pages/admin/rooms/RoomCreate.vue'),
-                    // },
-                    // {
-                    //     name: 'admin-rooms-edit',
-                    //     path: ':id/edit',
-                    //     props: true,
-                    //     component: () =>
-                    //         import('@/pages/admin/rooms/RoomEdit.vue'),
-                    // },
+                    {
+                        name: 'admin-rooms-create',
+                        path: 'create',
+                        component: () =>
+                            import('@/pages/admin/rooms/CreateNewRoom.vue'),
+                    },
+                    {
+                        name: 'admin-rooms-edit',
+                        path: ':id/edit',
+                        props: true,
+                        component: () =>
+                            import('@/pages/admin/rooms/EditRoom.vue'),
+                    },
                 ],
             },
         ],
