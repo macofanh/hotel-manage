@@ -114,9 +114,6 @@ const formatShortDate = (dateString: string) => {
                     <div class="size-6 text-primary">
                         <span class="material-symbols-outlined text-[28px]">receipt_long</span>
                     </div>
-                    <h2 class="text-xl font-extrabold leading-tight tracking-tight">
-                        Quản lý Đơn đặt phòng
-                    </h2>
                 </div>
                 <div class="relative w-80">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>

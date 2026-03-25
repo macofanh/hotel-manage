@@ -201,12 +201,14 @@ const handleFileChange = async (event: Event) => {
                         <div class="flex flex-col">
                             <router-link
                                 :to="{ name: 'profile' }"
-                                class="flex items-center gap-3 px-6 py-4 bg-orange-50 border-l-4 border-primary text-primary font-bold"
+                                class="flex items-center justify-between px-6 py-4 text-gray-600 hover:bg-gray-50 hover:text-primary font-medium transition-colors border-l-4 border-transparent"
                             >
-                                <span class="material-icons-outlined"
-                                    >person</span
-                                >
-                                Thông tin tài khoản
+                                <div class="flex items-center gap-3">
+                                    <span class="material-icons-outlined"
+                                        >person</span
+                                    >
+                                    Thông tin tài khoản
+                                </div>
                             </router-link>
 
                             <router-link
@@ -224,12 +226,14 @@ const handleFileChange = async (event: Event) => {
                             <router-link
                                 v-if="isAdmin"
                                 :to="{ name: 'admin-overview' }"
-                                class="flex items-center gap-3 px-6 py-4 text-orange-600 bg-orange-50/50 hover:bg-orange-100 font-bold transition-colors border-l-4 border-transparent cursor-pointer"
+                                class="flex items-center justify-between px-6 py-4 text-gray-600 hover:bg-gray-50 hover:text-primary font-medium transition-colors border-l-4 border-transparent"
                             >
-                                <span class="material-icons-outlined"
-                                    >admin_panel_settings</span
-                                >
-                                Quản trị hệ thống
+                                <div class="flex items-center gap-3">
+                                    <span class="material-icons-outlined"
+                                        >admin_panel_settings</span
+                                    >
+                                    Quản trị hệ thống
+                                </div>
                             </router-link>
 
                             <a

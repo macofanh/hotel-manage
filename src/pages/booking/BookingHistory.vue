@@ -1,68 +1,68 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import httpClient from '@/api/axiosClient'
 
-// Trạng thái bộ lọc hiện tại
-const currentFilter = ref('all') // 'all', 'upcoming', 'completed', 'cancelled'
+const router = useRouter()
+const currentFilter = ref('all') // all, upcoming, completed, cancelled
+const bookings = ref<any[]>([])
+const isLoading = ref(true)
 
+const fetchMyBookings = async () => {
+    try {
+        const res: any = await httpClient.get('/api/bookings/my-bookings')
+        bookings.value = res.data || res
+    } catch (error) {
+        console.error('Lỗi lấy lịch sử:', error)
+    } finally {
+        isLoading.value = false
+    }
+}
 
-const bookings = ref([
-    {
-        id: 'DH-10293',
-        roomName: 'Phòng Junior Suite Cao Cấp',
-        image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=400&auto=format&fit=crop',
-        checkIn: '12 Th10, 2026',
-        checkOut: '15 Th10, 2026',
-        guests: '2 Người lớn, 1 Trẻ em',
-        totalPrice: 300,
-        status: 'upcoming', // sắp tới
-        bookingDate: '01 Th10, 2026',
-    },
-    {
-        id: 'DH-09821',
-        roomName: 'Phòng Super Deluxe',
-        image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=400&auto=format&fit=crop',
-        checkIn: '05 Th09, 2026',
-        checkOut: '07 Th09, 2026',
-        guests: '4 Người lớn',
-        totalPrice: 400,
-        status: 'completed', // đã hoàn thành
-        bookingDate: '20 Th08, 2026',
-    },
-    {
-        id: 'DH-08744',
-        roomName: 'Phòng Executive Suite',
-        image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=400&auto=format&fit=crop',
-        checkIn: '10 Th08, 2026',
-        checkOut: '12 Th08, 2026',
-        guests: '2 Người lớn',
-        totalPrice: 300,
-        status: 'cancelled', // đã hủy
-        bookingDate: '05 Th08, 2026',
-    },
-])
+onMounted(() => fetchMyBookings())
 
-// Lọc đơn hàng dựa trên Tab đang chọn
+// Map DB status sang FE Tab status
+const getTabStatus = (dbStatus: string) => {
+    if (['PENDING', 'CONFIRMED'].includes(dbStatus)) return 'upcoming'
+    if (['CHECKED_IN', 'CHECKED_OUT'].includes(dbStatus)) return 'completed'
+    return 'cancelled'
+}
+
 const filteredBookings = computed(() => {
     if (currentFilter.value === 'all') return bookings.value
-    return bookings.value.filter((b) => b.status === currentFilter.value)
+    return bookings.value.filter(
+        (b) => getTabStatus(b.status) === currentFilter.value,
+    )
 })
 
-// Hàm lấy màu sắc và Text cho Badge Trạng thái
+// UI Badge
 const getStatusBadge = (status: string) => {
     switch (status) {
-        case 'upcoming':
+        case 'PENDING':
+            return {
+                class: 'bg-amber-50 text-amber-600 border-amber-200',
+                text: 'Chờ thanh toán cọc',
+                icon: 'pending_actions',
+            }
+        case 'CONFIRMED':
             return {
                 class: 'bg-blue-50 text-blue-600 border-blue-200',
-                text: 'Sắp tới',
+                text: 'Đã xác nhận cọc',
                 icon: 'schedule',
             }
-        case 'completed':
+        case 'CHECKED_IN':
+            return {
+                class: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+                text: 'Đang lưu trú',
+                icon: 'vpn_key',
+            }
+        case 'CHECKED_OUT':
             return {
                 class: 'bg-green-50 text-green-600 border-green-200',
                 text: 'Đã hoàn thành',
                 icon: 'check_circle',
             }
-        case 'cancelled':
+        case 'CANCELLED':
             return {
                 class: 'bg-red-50 text-red-600 border-red-200',
                 text: 'Đã hủy',
@@ -76,6 +76,20 @@ const getStatusBadge = (status: string) => {
             }
     }
 }
+
+const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+    }).format(val || 0)
+const formatDate = (dateString: string) => {
+    if (!dateString) return ''
+    return new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(new Date(dateString))
+}
 </script>
 
 <template>
@@ -87,31 +101,28 @@ const getStatusBadge = (status: string) => {
                 >
                     Đơn đặt phòng của tôi
                 </h1>
-                <p class="text-gray-500 mt-2">
-                    Quản lý và theo dõi lịch sử các chuyến đi của bạn.
-                </p>
             </div>
 
-            <div class="flex overflow-x-auto gap-2 mb-8 pb-2 scrollbar-hide">
+            <div class="flex overflow-x-auto gap-2 mb-8 pb-2">
                 <button
                     @click="currentFilter = 'all'"
                     :class="
                         currentFilter === 'all'
-                            ? 'bg-gray-900 text-white shadow-md'
-                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200'
                     "
-                    class="px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
-                    Tất cả đơn
+                    Tất cả
                 </button>
                 <button
                     @click="currentFilter = 'upcoming'"
                     :class="
                         currentFilter === 'upcoming'
-                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200'
                     "
-                    class="px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
                     Sắp tới
                 </button>
@@ -119,28 +130,35 @@ const getStatusBadge = (status: string) => {
                     @click="currentFilter = 'completed'"
                     :class="
                         currentFilter === 'completed'
-                            ? 'bg-green-600 text-white shadow-md shadow-green-600/20'
-                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200'
                     "
-                    class="px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
-                    Đã hoàn thành
+                    Đã ở
                 </button>
                 <button
                     @click="currentFilter = 'cancelled'"
                     :class="
                         currentFilter === 'cancelled'
-                            ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
-                            : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-white text-gray-600 border border-gray-200'
                     "
-                    class="px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all"
+                    class="px-5 py-2.5 rounded-xl font-bold text-sm"
                 >
                     Đã hủy
                 </button>
             </div>
 
+            <div v-if="isLoading" class="flex justify-center py-10">
+                <span
+                    class="material-symbols-outlined animate-spin text-primary text-4xl"
+                    >autorenew</span
+                >
+            </div>
+
             <div
-                v-if="filteredBookings.length === 0"
+                v-else-if="filteredBookings.length === 0"
                 class="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm"
             >
                 <div
@@ -153,12 +171,9 @@ const getStatusBadge = (status: string) => {
                 <h3 class="text-lg font-bold text-gray-900 mb-2">
                     Chưa có đơn đặt phòng nào
                 </h3>
-                <p class="text-gray-500 mb-6 text-sm">
-                    Bạn chưa có chuyến đi nào trong danh mục này.
-                </p>
                 <router-link
                     :to="{ name: 'room' }"
-                    class="inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-md hover:bg-orange-600 transition-colors"
+                    class="mt-4 inline-flex items-center justify-center px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-md"
                 >
                     Khám phá phòng ngay
                 </router-link>
@@ -167,129 +182,95 @@ const getStatusBadge = (status: string) => {
             <div v-else class="flex flex-col gap-6">
                 <div
                     v-for="booking in filteredBookings"
-                    :key="booking.id"
-                    class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-6"
+                    :key="booking.booking_id"
+                    class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col gap-4"
                 >
                     <div
-                        class="w-full md:w-48 h-32 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100"
+                        class="flex justify-between items-start border-b border-gray-50 pb-4"
                     >
-                        <img
-                            :src="booking.image"
-                            :alt="booking.roomName"
-                            class="w-full h-full object-cover"
-                        />
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span
+                                    class="text-xs font-bold text-primary tracking-wider"
+                                    >MÃ ĐƠN: #MAC-{{ booking.booking_id }}</span
+                                >
+                                <span class="text-gray-300">•</span>
+                                <span class="text-xs text-gray-500"
+                                    >Đặt ngày
+                                    {{ formatDate(booking.created_at) }}</span
+                                >
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900">
+                                Phòng {{ booking.room?.room_number }}
+                            </h3>
+                        </div>
+                        <div
+                            :class="getStatusBadge(booking.status).class"
+                            class="flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold"
+                        >
+                            <span class="material-icons-outlined text-[14px]">{{
+                                getStatusBadge(booking.status).icon
+                            }}</span>
+                            {{ getStatusBadge(booking.status).text }}
+                        </div>
                     </div>
 
-                    <div class="flex-1 flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start mb-2">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span
-                                            class="text-xs font-bold text-gray-500 tracking-wider"
-                                            >MÃ ĐƠN: {{ booking.id }}</span
-                                        >
-                                        <span class="text-gray-300">•</span>
-                                        <span class="text-xs text-gray-500"
-                                            >Đặt ngày
-                                            {{ booking.bookingDate }}</span
-                                        >
-                                    </div>
-                                    <h3 class="text-lg font-bold text-gray-900">
-                                        {{ booking.roomName }}
-                                    </h3>
-                                </div>
-
-                                <div
-                                    :class="
-                                        getStatusBadge(booking.status).class
-                                    "
-                                    class="flex items-center gap-1 px-3 py-1 rounded-full border text-xs font-bold"
-                                >
-                                    <span
-                                        class="material-icons-outlined text-[14px]"
-                                        >{{
-                                            getStatusBadge(booking.status).icon
-                                        }}</span
-                                    >
-                                    {{ getStatusBadge(booking.status).text }}
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-y-2 mt-4 text-sm">
-                                <div
-                                    class="flex items-center gap-2 text-gray-600"
-                                >
-                                    <span
-                                        class="material-icons-outlined text-gray-400 text-lg"
-                                        >calendar_today</span
-                                    >
-                                    <span
-                                        >{{ booking.checkIn }}
-                                        <span class="mx-1">→</span>
-                                        {{ booking.checkOut }}</span
-                                    >
-                                </div>
-                                <div
-                                    class="flex items-center gap-2 text-gray-600"
-                                >
-                                    <span
-                                        class="material-icons-outlined text-gray-400 text-lg"
-                                        >group</span
-                                    >
-                                    <span>{{ booking.guests }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="flex items-center justify-between mt-6 pt-4 border-t border-gray-50"
-                        >
-                            <div class="flex items-baseline gap-1.5">
-                                <span class="text-sm text-gray-500 font-medium"
-                                    >Tổng tiền:</span
-                                >
+                    <div
+                        class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                    >
+                        <div class="flex items-center gap-6 text-sm">
+                            <div class="flex items-center gap-2 text-gray-600">
                                 <span
-                                    class="text-xl font-extrabold text-gray-900"
-                                    >${{ booking.totalPrice }}</span
+                                    class="material-icons-outlined text-gray-400"
+                                    >login</span
                                 >
+                                <span class="font-bold text-gray-900">{{
+                                    formatDate(booking.check_in_date)
+                                }}</span>
                             </div>
-
-                            <div class="flex gap-3">
-                                <button
-                                    v-if="booking.status === 'upcoming'"
-                                    class="px-4 py-2 text-sm font-bold text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            <div
+                                class="w-4 border-t-2 border-dashed border-gray-200"
+                            ></div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <span
+                                    class="material-icons-outlined text-gray-400"
+                                    >logout</span
                                 >
-                                    Hủy phòng
-                                </button>
-
-                                <button
-                                    v-if="booking.status === 'completed'"
-                                    class="px-4 py-2 text-sm font-bold text-primary bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
-                                >
-                                    Đánh giá
-                                </button>
-
-                                <button
-                                    class="px-4 py-2 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-lg transition-colors shadow-sm"
-                                >
-                                    Xem chi tiết
-                                </button>
+                                <span class="font-bold text-gray-900">{{
+                                    formatDate(booking.check_out_date)
+                                }}</span>
                             </div>
                         </div>
+
+                        <div class="text-right w-full md:w-auto">
+                            <span class="text-sm text-gray-500 font-medium mr-2"
+                                >Tổng tiền:</span
+                            >
+                            <span
+                                class="text-xl font-extrabold text-gray-900"
+                                >{{
+                                    formatCurrency(booking.total_amount)
+                                }}</span
+                            >
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="booking.status === 'PENDING'"
+                        class="flex justify-end pt-2 border-t border-gray-50"
+                    >
+                        <router-link
+                            :to="{
+                                name: 'booking-complete',
+                                params: { id: booking.booking_id },
+                            }"
+                            class="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-orange-600 rounded-lg shadow-sm"
+                        >
+                            Tiếp tục thanh toán cọc
+                        </router-link>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </template>
-
-<style scoped>
-.scrollbar-hide::-webkit-scrollbar {
-    display: none;
-}
-.scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-</style>

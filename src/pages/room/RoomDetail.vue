@@ -1,96 +1,110 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import httpClient from '@/api/axiosClient'
 
 const router = useRouter()
-
-const props = defineProps<{
-    id: string
-}>()
+const props = defineProps<{ id: string }>()
 
 const room = ref<any>(null)
+const similarRooms = ref<any[]>([]) // 🌟 KHAI BÁO BIẾN CHỨA PHÒNG TƯƠNG TỰ
 const isLoading = ref(true)
 
-const similarRooms = ref([
-    {
-        id: 2,
-        name: 'Phòng Executive Suite',
-        price: 150,
-        info: 'King Bed | 2 Bath',
-        image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=600&auto=format&fit=crop',
-    },
-    {
-        id: 3,
-        name: 'Phòng Super Deluxe',
-        price: 200,
-        info: '4 Giường | 3 Bath',
-        image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=600&auto=format&fit=crop',
-    },
-])
+// Dữ liệu fix cứng cho đẹp giao diện (Vì DB chưa lưu Icon tiện ích lẻ)
+const defaultAmenities = [
+    { icon: 'wifi', name: 'Wi-Fi tốc độ cao' },
+    { icon: 'ac_unit', name: 'Điều hòa nhiệt độ' },
+    { icon: 'tv', name: 'Smart TV 65"' },
+    { icon: 'bathtub', name: 'Bồn tắm cao cấp' },
+]
 
 const fetchRoomDetail = async (roomId: string) => {
     isLoading.value = true
+    try {
+        // 1. LẤY CHI TIẾT PHÒNG
+        const res: any = await httpClient.get(`/api/rooms/${roomId}`)
+        const data = res.data || res
 
-    // Giả lập delay mạng (nửa giây)
-    await new Promise((resolve) => setTimeout(resolve, 500))
+        room.value = {
+            id: data.room_id || data.id,
+            name: `Phòng ${data.room_number}`,
+            type_name: data.room_type?.type_name || '',
+            price: data.price_per_night || data.room_type?.base_price || 0,
+            rating: 4.9,
+            reviews: 128,
+            size: '450 sqft',
+            capacity: data.room_type?.capacity || 2,
+            description: [
+                data.room_type?.description ||
+                    'Phòng nghỉ với đầy đủ tiện nghi...',
+            ],
+            images: data.images?.length
+                ? data.images.map((i: any) => getFullUrl(i.image_url))
+                : data.image_url
+                  ? [getFullUrl(data.image_url)]
+                  : [getFullUrl('')],
+            amenities: defaultAmenities,
+        }
 
-    // Giả lập logic lấy data dựa trên ID
-    room.value = {
-        id: Number(roomId),
-        name:
-            roomId === '1'
-                ? 'Phòng Junior Suite'
-                : roomId === '2'
-                  ? 'Phòng Executive Suite'
-                  : 'Phòng Super Deluxe',
-        price: roomId === '1' ? 100 : roomId === '2' ? 150 : 200,
-        rating: 4.9,
-        reviews: 128,
-        size: '450 sqft',
-        bed: roomId === '3' ? '4 Giường' : 'King Bed',
-        bath: roomId === '1' ? '2 Bath' : '3 Bath',
-        description: [
-            'Trải nghiệm sự thanh lịch đích thực trong phòng của chúng tôi. Được thiết kế với sự pha trộn hoàn hảo giữa sự sang trọng và thoải mái, căn phòng mang đến không gian sinh hoạt mở rộng rãi với lối trang trí hiện đại, tinh tế.',
-            'Cho dù bạn đi công tác hay nghỉ dưỡng, chúng tôi cung cấp mọi tiện nghi bạn cần cho một kỳ nghỉ dưỡng trọn vẹn, bao gồm không gian làm việc chuyên dụng, internet tốc độ cao và hệ thống giải trí cao cấp.',
-        ],
-        images: [
-            'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop',
-            'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=600&auto=format&fit=crop',
-            'https://images.unsplash.com/photo-1631049035182-249067d7618e?q=80&w=600&auto=format&fit=crop',
-            'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=600&auto=format&fit=crop',
-            'https://images.unsplash.com/photo-1566665797739-1674de7a421a?q=80&w=600&auto=format&fit=crop',
-        ],
-        amenities: [
-            { icon: 'wifi', name: 'Wi-Fi tốc độ cao' },
-            { icon: 'ac_unit', name: 'Điều hòa nhiệt độ' },
-            { icon: 'tv', name: 'Smart TV 65"' },
-            { icon: 'bathtub', name: 'Bồn tắm cao cấp' },
-        ],
+        // 2. LẤY DANH SÁCH PHÒNG TƯƠNG TỰ (Tự gọi API và lọc ra)
+        const allRoomsRes: any = await httpClient.get('/api/rooms/')
+        const allRooms = allRoomsRes.data || allRoomsRes
+
+        // Lọc lấy 3 phòng đang trống và KHÁC với phòng đang xem
+        similarRooms.value = allRooms
+            .filter(
+                (r: any) =>
+                    r.status === 'AVAILABLE' && r.room_id !== Number(roomId),
+            )
+            .slice(0, 3)
+            .map((r: any) => ({
+                id: r.room_id || r.id,
+                name: `Phòng ${r.room_number}`,
+                price: r.price_per_night || r.room_type?.base_price || 0,
+                image: getFullUrl(r.images?.[0]?.image_url || r.image_url),
+            }))
+    } catch (error) {
+        console.error('Lỗi lấy chi tiết phòng:', error)
+        alert('Phòng không tồn tại!')
+        router.push({ name: 'room' })
+    } finally {
+        isLoading.value = false
     }
-
-    isLoading.value = false
 }
 
-// 3. THEO DÕI SỰ THAY ĐỔI CỦA ID TỪ URL
 watch(
     () => props.id,
     (newId) => {
         if (newId) {
             fetchRoomDetail(newId)
-            // Cuộn lên đầu trang mỗi khi chuyển phòng
             window.scrollTo({ top: 0, behavior: 'smooth' })
         }
     },
-    { immediate: true }, // immediate: true giúp hàm này chạy ngay lập tức khi vừa vào trang
+    { immediate: true },
 )
 
-const handleProceedToBooking = () => {
-    router.push({ name: 'booking', params: { id: room.value.id } })
+const handleProceedToBooking = (bookingRoomId?: number) => {
+    // Nếu ấn từ mục phòng tương tự thì truyền id đó, còn không thì truyền id phòng hiện tại
+    const idToBook = bookingRoomId || room.value.id
+    router.push({ name: 'booking', params: { id: idToBook } })
 }
 
 const goToRoom = (id: number) => {
-    // Chuyển sang phòng khác -> URL đổi -> watch bắt được -> tự gọi lại data
     router.push({ name: 'room-detail', params: { id: id.toString() } })
+}
+
+const getFullUrl = (path: string) => {
+    if (!path)
+        return 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop'
+    if (path.startsWith('http')) return path
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${path}`
+}
+
+const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+    }).format(val || 0)
 }
 </script>
 
@@ -101,25 +115,10 @@ const goToRoom = (id: number) => {
             class="flex items-center justify-center w-full h-96"
         >
             <div class="flex flex-col items-center gap-3">
-                <svg
-                    class="animate-spin h-8 w-8 text-primary"
-                    viewBox="0 0 24 24"
+                <span
+                    class="material-symbols-outlined animate-spin text-primary text-4xl"
+                    >autorenew</span
                 >
-                    <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                        fill="none"
-                    ></circle>
-                    <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                </svg>
                 <span class="text-gray-500 font-medium"
                     >Đang tải thông tin phòng...</span
                 >
@@ -161,15 +160,14 @@ const goToRoom = (id: number) => {
                                 backgroundImage: `url(${room.images[0]})`,
                             }"
                         ></div>
-                        <div class="grid grid-cols-4 gap-4">
+                        <div
+                            class="grid grid-cols-4 gap-4"
+                            v-if="room.images.length > 1"
+                        >
                             <div
-                                v-for="(img, index) in room.images.slice(1)"
+                                v-for="(img, index) in room.images.slice(1, 5)"
                                 :key="index"
                                 class="aspect-[4/3] bg-center bg-no-repeat bg-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                                :class="{
-                                    'ring-2 ring-primary ring-offset-2':
-                                        index === 0,
-                                }"
                                 :style="{ backgroundImage: `url(${img})` }"
                             ></div>
                         </div>
@@ -224,22 +222,16 @@ const goToRoom = (id: number) => {
                                 {{ room.name }}
                             </h1>
                             <p
-                                class="text-[#8a7a60] text-sm flex items-center gap-1 mt-1"
+                                class="text-sm font-bold text-primary uppercase tracking-wide"
                             >
-                                <span
-                                    class="material-symbols-outlined text-primary text-sm"
-                                    >star</span
-                                >
-                                <span class="font-bold text-gray-800">{{
-                                    room.rating
-                                }}</span>
-                                ({{ room.reviews }} đánh giá)
+                                {{ room.type_name }}
                             </p>
                         </div>
 
                         <div class="flex items-baseline gap-2">
-                            <span class="text-3xl font-extrabold text-[#181511]"
-                                >${{ room.price }}</span
+                            <span
+                                class="text-3xl font-extrabold text-[#181511]"
+                                >{{ formatCurrency(room.price) }}</span
                             >
                             <span class="text-[#8a7a60] font-medium"
                                 >/ Đêm</span
@@ -255,21 +247,21 @@ const goToRoom = (id: number) => {
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="material-symbols-outlined text-primary"
-                                        >king_bed</span
+                                        >group</span
                                     >
                                     <span
                                         class="text-sm font-medium text-gray-800"
-                                        >{{ room.bed }}</span
+                                        >{{ room.capacity }} Người</span
                                     >
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="material-symbols-outlined text-primary"
-                                        >bathroom</span
+                                        >wifi</span
                                     >
                                     <span
                                         class="text-sm font-medium text-gray-800"
-                                        >{{ room.bath }}</span
+                                        >Miễn phí</span
                                     >
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -286,7 +278,7 @@ const goToRoom = (id: number) => {
                         </div>
 
                         <button
-                            @click="handleProceedToBooking"
+                            @click="handleProceedToBooking()"
                             class="w-full bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 mt-2"
                         >
                             Tiến hành đặt phòng
@@ -299,10 +291,11 @@ const goToRoom = (id: number) => {
             </div>
 
             <div
+                v-if="similarRooms.length > 0"
                 class="flex flex-col gap-6 py-10 border-t border-gray-200 mt-4"
             >
                 <h3 class="text-2xl font-bold text-gray-900">
-                    Các phòng tương tự
+                    Các phòng trống khác
                 </h3>
                 <div
                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
@@ -310,7 +303,7 @@ const goToRoom = (id: number) => {
                     <div
                         v-for="simRoom in similarRooms"
                         :key="simRoom.id"
-                        class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer hover:shadow-md transition-shadow"
+                        class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer hover:shadow-md transition-shadow flex flex-col"
                         @click="goToRoom(simRoom.id)"
                     >
                         <div
@@ -319,19 +312,22 @@ const goToRoom = (id: number) => {
                                 backgroundImage: `url(${simRoom.image})`,
                             }"
                         ></div>
-                        <div class="p-5 flex flex-col gap-2 relative bg-white">
-                            <div class="flex justify-between items-center">
+                        <div class="p-5 flex flex-col gap-2 flex-1 bg-white">
+                            <div class="flex justify-between items-start gap-2">
                                 <p class="font-bold text-lg text-gray-900">
                                     {{ simRoom.name }}
                                 </p>
-                                <p class="text-primary font-bold">
-                                    ${{ simRoom.price }}/đêm
+                                <p
+                                    class="text-primary font-bold text-sm whitespace-nowrap"
+                                >
+                                    {{ formatCurrency(simRoom.price) }}
                                 </p>
                             </div>
                             <button
-                                class="mt-2 text-primary text-sm font-bold flex items-center gap-1 hover:text-orange-600 transition-colors w-max"
+                                @click.stop="handleProceedToBooking(simRoom.id)"
+                                class="mt-auto text-primary text-sm font-bold flex items-center gap-1 hover:text-orange-600 transition-colors w-max pt-2"
                             >
-                                Xem chi tiết
+                                Đặt ngay phòng này
                                 <span class="material-symbols-outlined text-sm"
                                     >arrow_right_alt</span
                                 >

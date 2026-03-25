@@ -62,7 +62,8 @@ const routes: Array<RouteRecordRaw> = [
                 children: [
                     {
                         name: 'booking',
-                        path: '',
+                        path: ':id',
+                        props: true,
                         component: () =>
                             import('@/pages/booking/BookingPage.vue'),
                     },

@@ -1,80 +1,155 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import httpClient from '@/api/axiosClient'
+import { useAuth } from '../auth/useAuth'
+import { profileService } from '../profile/profileService'
 
-// Nhận ID từ URL
-const props = defineProps<{
-    id: string
-}>()
-
+const props = defineProps<{ id: string }>() // Đây là room_id
 const router = useRouter()
+const { currentUser: authUser } = useAuth()
 
-// 1. DỮ LIỆU FORM (Điền sẵn tên bạn)
+// 🌟 Đưa hàm getFullUrl lên trên để các hàm bên dưới gọi không bị lỗi
+const getFullUrl = (path: string) => {
+    if (!path) return 'https://placehold.co/600x400'
+    if (path.startsWith('http')) return path
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${path}`
+}
+
+const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+    }).format(val || 0)
+}
+
+// Lấy ngày hôm nay và ngày mai làm mặc định
+const today = new Date().toISOString().split('T')[0]
+const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
+
+// 1. DỮ LIỆU FORM (Dùng để gửi đi khi đặt phòng)
 const form = reactive({
-    fullName: 'Tuấn Anh',
-    email: 'tuananh@example.com',
-    phone: '0123 456 789',
-    arrivalTime: 'Tôi chưa rõ',
+    fullName: '',
+    email: '',
+    phone: '',
+    checkIn: today,
+    checkOut: tomorrow,
     requests: '',
     terms: false,
 })
 
-// 2. BIẾN TRẠNG THÁI VÀ DỮ LIỆU PHÒNG
+// Dữ liệu User dùng chung
+const currentUser = reactive({
+    fullName: '',
+    email: '',
+    phone: '',
+    dob: '',
+    address: '',
+    avatar: '',
+    joinDate: '',
+})
+
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const room = ref<any>(null)
 
-// 3. FAKE API LẤY THÔNG TIN PHÒNG
-onMounted(async () => {
-    // Giả lập thời gian tải API
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Tạo ID mặc định nếu URL bị thiếu
-    const roomId = props.id || '1'
-
-    room.value = {
-        id: roomId,
-        name:
-            roomId === '3'
-                ? 'Phòng Super Deluxe'
-                : roomId === '2'
-                  ? 'Phòng Executive Suite'
-                  : 'Phòng Junior Suite Cao Cấp',
-        hotel: 'MacHotel Luxury',
-        rating: 4.9,
-        image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=400&auto=format&fit=crop',
-        pricePerNight: roomId === '3' ? 200 : roomId === '2' ? 150 : 100,
-        nights: 3,
-        serviceFee: 45.0,
-        tax: 28.5,
-        checkIn: '12 Th10, 2026',
-        checkOut: '15 Th10, 2026',
-        guests: '2 Người lớn',
-    }
-
-    isLoading.value = false
+// Tự động tính số đêm
+const nights = computed(() => {
+    if (!form.checkIn || !form.checkOut) return 1
+    const start = new Date(form.checkIn).getTime()
+    const end = new Date(form.checkOut).getTime()
+    const diff = Math.ceil((end - start) / (1000 * 3600 * 24))
+    return diff > 0 ? diff : 1
 })
 
-// 4. HÀM XỬ LÝ ĐẶT PHÒNG DUY NHẤT
+// Tính tổng tiền dự kiến
+const estimatedTotal = computed(() => {
+    if (!room.value) return 0
+    const price =
+        room.value.price_per_night || room.value.room_type?.base_price || 0
+    return price * nights.value
+})
+
+// 2. LẤY THÔNG TIN USER TỪ SERVICE (Cách mới chuẩn chỉnh)
+const fetchProfile = async () => {
+    if (authUser.value) {
+        currentUser.fullName = authUser.value.full_name || ''
+        currentUser.email = authUser.value.email || ''
+    }
+
+    try {
+        const data: any = await profileService.getProfile()
+
+        currentUser.fullName = data.full_name || currentUser.fullName
+        currentUser.email = data.email || currentUser.email
+        currentUser.phone = data.phone_number || ''
+        currentUser.avatar = getFullUrl(data.avatar_url || '')
+
+        if (data.created_at) {
+            const date = new Date(data.created_at)
+            currentUser.joinDate = `Tháng ${date.getMonth() + 1}, ${date.getFullYear()}`
+        }
+
+        // 🌟 Gán thẳng dữ liệu từ currentUser vào form
+        form.fullName = currentUser.fullName
+        form.email = currentUser.email
+        form.phone = currentUser.phone
+    } catch (error) {
+        console.error('Lỗi tải profile:', error)
+        // Backup: Lỡ API Profile có lỗi thì vẫn có tên và email từ authUser
+        form.fullName = currentUser.fullName
+        form.email = currentUser.email
+    }
+}
+
+// 3. LẤY THÔNG TIN PHÒNG (Đã dọn dẹp sạch sẽ, chỉ còn lấy phòng)
+const fetchRoom = async () => {
+    try {
+        const res: any = await httpClient.get(`/api/rooms/${props.id}`)
+        room.value = res.data || res
+    } catch (error) {
+        alert('Phòng không tồn tại!')
+        router.push({ name: 'room' })
+    } finally {
+        isLoading.value = false
+    }
+}
+
+// Chạy song song cả 2 hàm khi load trang
+onMounted(async () => {
+    await Promise.all([fetchProfile(), fetchRoom()])
+})
+
+// 4. XỬ LÝ ĐẶT PHÒNG GỌI API
 const handleCompleteBooking = async () => {
-    // Kiểm tra đã tick ô điều khoản chưa
     if (!form.terms) {
-        alert('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật!')
+        alert('Vui lòng đồng ý với Điều khoản dịch vụ!')
+        return
+    }
+
+    if (new Date(form.checkIn!) >= new Date(form.checkOut!)) {
+        alert('Ngày trả phòng phải sau ngày nhận phòng!')
         return
     }
 
     isSubmitting.value = true
     try {
-        // Xoay loading 1 giây cho giao diện mượt mà
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        const payload = {
+            room_id: Number(props.id),
+            check_in_date: new Date(`${form.checkIn}T14:00:00`).toISOString(),
+            check_out_date: new Date(`${form.checkOut}T12:00:00`).toISOString(),
+        }
 
-        // Chuyển hướng sang trang quét mã QR, đảm bảo luôn có ID
-        router.push({ name: 'booking-complete', params: { id: room.value.id } })
-    } catch (error) {
-        console.error('Lỗi chuyển trang:', error)
-        alert(
-            'Có lỗi xảy ra: Không tìm thấy đường dẫn chuyển trang. Vui lòng kiểm tra lại cấu hình file router/index.ts',
-        )
+        const res: any = await httpClient.post('/api/bookings/', payload)
+        const bookingData = res.data || res
+
+        router.push({
+            name: 'booking-complete',
+            params: { id: bookingData.booking_id },
+        })
+    } catch (error: any) {
+        console.error('Lỗi đặt phòng:', error)
+        alert(error.response?.data?.detail || 'Có lỗi xảy ra khi đặt phòng!')
     } finally {
         isSubmitting.value = false
     }
@@ -88,25 +163,10 @@ const handleCompleteBooking = async () => {
             class="flex items-center justify-center w-full h-96"
         >
             <div class="flex flex-col items-center gap-3">
-                <svg
-                    class="animate-spin h-8 w-8 text-primary"
-                    viewBox="0 0 24 24"
+                <span
+                    class="material-symbols-outlined animate-spin text-primary text-4xl"
+                    >autorenew</span
                 >
-                    <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                        fill="none"
-                    ></circle>
-                    <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                </svg>
                 <span class="text-gray-500 font-medium"
                     >Đang chuẩn bị đơn đặt phòng...</span
                 >
@@ -117,34 +177,12 @@ const handleCompleteBooking = async () => {
             <div
                 class="layout-content-container flex flex-col max-w-[1200px] w-full px-6 md:px-10"
             >
-                <div class="flex flex-wrap gap-2 py-4">
-                    <router-link
-                        :to="{ name: 'home' }"
-                        class="text-[#8d7a5e] text-sm font-medium hover:text-primary"
-                        >Trang chủ</router-link
-                    >
-                    <span class="text-[#8d7a5e] text-sm font-medium">/</span>
-                    <router-link
-                        :to="{ name: 'room' }"
-                        class="text-[#8d7a5e] text-sm font-medium hover:text-primary"
-                        >Phòng nghỉ</router-link
-                    >
-                    <span class="text-[#8d7a5e] text-sm font-medium">/</span>
-                    <span class="text-[#181510] text-sm font-medium"
-                        >Thanh toán</span
-                    >
-                </div>
-
                 <div class="flex flex-wrap justify-between gap-3 py-6">
                     <div class="flex flex-col gap-2">
                         <p
-                            class="text-[#181510] text-4xl font-black leading-tight tracking-[-0.033em]"
+                            class="text-[#181510] text-3xl font-black leading-tight tracking-tight"
                         >
-                            Kiểm tra thông tin
-                        </p>
-                        <p class="text-[#8d7a5e] text-lg font-medium">
-                            Vui lòng điền thông tin của bạn để xác nhận yêu cầu
-                            đặt phòng.
+                            Xác nhận thông tin đặt phòng
                         </p>
                     </div>
                 </div>
@@ -157,19 +195,50 @@ const handleCompleteBooking = async () => {
                         <div
                             class="bg-white rounded-2xl p-8 shadow-sm border border-[#e7e2da]"
                         >
-                            <h3 class="text-[#181510] text-2xl font-bold mb-6">
-                                Thông tin liên hệ
+                            <h3 class="text-[#181510] text-xl font-bold mb-6">
+                                Thông tin chuyến đi & Liên hệ
                             </h3>
+
+                            <div
+                                class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-gray-200"
+                            >
+                                <div class="flex flex-col gap-2">
+                                    <label
+                                        class="text-sm font-bold text-gray-900"
+                                        >Nhận phòng (Check-in) *</label
+                                    >
+                                    <input
+                                        v-model="form.checkIn"
+                                        :min="today"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                        type="date"
+                                        required
+                                    />
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <label
+                                        class="text-sm font-bold text-gray-900"
+                                        >Trả phòng (Check-out) *</label
+                                    >
+                                    <input
+                                        v-model="form.checkOut"
+                                        :min="form.checkIn"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                        type="date"
+                                        required
+                                    />
+                                </div>
+                            </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="flex flex-col gap-2">
                                     <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Họ và tên</label
+                                        class="text-sm font-bold text-gray-900"
+                                        >Họ và tên *</label
                                     >
                                     <input
                                         v-model="form.fullName"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                                         type="text"
                                         required
                                     />
@@ -177,84 +246,59 @@ const handleCompleteBooking = async () => {
 
                                 <div class="flex flex-col gap-2">
                                     <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Địa chỉ Email</label
-                                    >
-                                    <input
-                                        v-model="form.email"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                        type="email"
-                                        required
-                                    />
-                                </div>
-
-                                <div class="flex flex-col gap-2">
-                                    <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Số điện thoại</label
+                                        class="text-sm font-bold text-gray-900"
+                                        >Số điện thoại *</label
                                     >
                                     <input
                                         v-model="form.phone"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                                         type="tel"
                                         required
                                     />
                                 </div>
 
-                                <div class="flex flex-col gap-2">
+                                <div class="md:col-span-2 flex flex-col gap-2">
                                     <label
-                                        class="text-sm font-bold text-[#181510]"
-                                        >Thời gian đến dự kiến (Tùy chọn)</label
+                                        class="text-sm font-bold text-gray-900"
+                                        >Địa chỉ Email *</label
                                     >
-                                    <select
-                                        v-model="form.arrivalTime"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary h-12 text-sm font-medium"
-                                    >
-                                        <option>Tôi chưa rõ</option>
-                                        <option>12:00 PM - 2:00 PM</option>
-                                        <option>2:00 PM - 4:00 PM</option>
-                                        <option>4:00 PM - 6:00 PM</option>
-                                    </select>
+                                    <input
+                                        v-model="form.email"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                        type="email"
+                                        required
+                                    />
                                 </div>
 
                                 <div class="md:col-span-2 flex flex-col gap-2">
                                     <label
-                                        class="text-sm font-bold text-[#181510]"
+                                        class="text-sm font-bold text-gray-900"
                                         >Yêu cầu đặc biệt</label
                                     >
                                     <textarea
                                         v-model="form.requests"
-                                        class="rounded-xl border-[#e7e2da] bg-transparent focus:border-primary focus:ring-primary text-sm font-medium resize-none"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
+                                        rows="3"
                                         placeholder="Thêm khăn tắm, phòng yên tĩnh..."
-                                        rows="4"
                                     ></textarea>
                                 </div>
 
                                 <div
-                                    class="md:col-span-2 flex items-start gap-3 pt-4"
+                                    class="md:col-span-2 flex items-start gap-3 pt-2"
                                 >
                                     <input
                                         v-model="form.terms"
-                                        class="mt-1 rounded border-[#e7e2da] text-primary focus:ring-primary cursor-pointer w-4 h-4"
+                                        class="mt-1 rounded border-gray-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
                                         id="terms"
                                         type="checkbox"
                                     />
                                     <label
-                                        class="text-sm text-[#8d7a5e] font-medium cursor-pointer"
+                                        class="text-sm text-gray-500 cursor-pointer leading-relaxed"
                                         for="terms"
                                     >
-                                        Tôi đồng ý với
-                                        <a
-                                            class="text-primary font-bold hover:underline"
-                                            href="#"
-                                            >Điều khoản dịch vụ</a
-                                        >
-                                        và
-                                        <a
-                                            class="text-primary font-bold hover:underline"
-                                            href="#"
-                                            >Chính sách bảo mật</a
-                                        >.
+                                        Tôi cam kết thông tin cá nhân là chính
+                                        xác và đồng ý với các chính sách hủy
+                                        phòng của khách sạn.
                                     </label>
                                 </div>
                             </div>
@@ -267,7 +311,7 @@ const handleCompleteBooking = async () => {
                         >
                             <div class="p-6 border-b border-[#e7e2da]">
                                 <h3 class="text-xl font-bold text-[#181510]">
-                                    Tóm tắt đặt phòng
+                                    Chi tiết đặt phòng
                                 </h3>
                             </div>
 
@@ -275,194 +319,92 @@ const handleCompleteBooking = async () => {
                                 <div
                                     class="flex items-start gap-4 pb-4 border-b border-[#e7e2da]"
                                 >
-                                    <div
-                                        class="w-24 h-20 rounded-xl bg-cover bg-center shrink-0 shadow-sm"
-                                        :style="{
-                                            backgroundImage: `url('${room.image}')`,
-                                        }"
-                                    ></div>
+                                    <img
+                                        :src="
+                                            getFullUrl(
+                                                room.images?.[0]?.image_url ||
+                                                    room.image_url,
+                                            )
+                                        "
+                                        class="w-24 h-20 rounded-xl object-cover shadow-sm"
+                                    />
                                     <div class="flex flex-col">
                                         <span
-                                            class="text-sm font-bold text-[#181510] line-clamp-2"
-                                            >{{ room.name }}</span
+                                            class="text-sm font-bold text-[#181510]"
+                                            >Phòng {{ room.room_number }}</span
                                         >
                                         <span
                                             class="text-xs text-[#8d7a5e] mt-1"
-                                            >{{ room.hotel }}</span
+                                            >{{
+                                                room.room_type?.type_name
+                                            }}</span
                                         >
-                                        <div
-                                            class="flex items-center gap-1 mt-1.5 text-primary"
-                                        >
-                                            <span
-                                                class="material-icons-outlined text-sm"
-                                                >star</span
-                                            >
-                                            <span class="text-xs font-bold">{{
-                                                room.rating
-                                            }}</span>
-                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="space-y-3 pt-2">
-                                    <div
-                                        class="flex justify-between items-center text-sm"
-                                    >
-                                        <span
-                                            class="text-[#8d7a5e] font-medium flex items-center gap-2"
+                                <div class="pt-2 space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-[#8d7a5e]"
+                                            >Giá mỗi đêm</span
                                         >
-                                            <span
-                                                class="material-symbols-outlined text-base"
-                                                >calendar_month</span
-                                            >
-                                            Ngày
-                                        </span>
-                                        <span class="font-bold text-[#181510]"
-                                            >{{ room.checkIn }} -
-                                            {{ room.checkOut }}</span
-                                        >
-                                    </div>
-                                    <div
-                                        class="flex justify-between items-center text-sm"
-                                    >
-                                        <span
-                                            class="text-[#8d7a5e] font-medium flex items-center gap-2"
-                                        >
-                                            <span
-                                                class="material-symbols-outlined text-base"
-                                                >nights_stay</span
-                                            >
-                                            Thời gian
-                                        </span>
-                                        <span class="font-bold text-[#181510]"
-                                            >{{ room.nights }} Đêm</span
-                                        >
-                                    </div>
-                                    <div
-                                        class="flex justify-between items-center text-sm"
-                                    >
-                                        <span
-                                            class="text-[#8d7a5e] font-medium flex items-center gap-2"
-                                        >
-                                            <span
-                                                class="material-symbols-outlined text-base"
-                                                >person</span
-                                            >
-                                            Số khách
-                                        </span>
                                         <span
                                             class="font-bold text-[#181510]"
-                                            >{{ room.guests }}</span
-                                        >
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="pt-4 border-t border-[#e7e2da] space-y-2"
-                                >
-                                    <div class="flex justify-between text-sm">
-                                        <span class="text-[#8d7a5e] font-medium"
-                                            >${{
-                                                room.pricePerNight.toFixed(2)
-                                            }}
-                                            x {{ room.nights }} đêm</span
-                                        >
-                                        <span class="font-bold text-[#181510]"
-                                            >${{
-                                                (
-                                                    room.pricePerNight *
-                                                    room.nights
-                                                ).toFixed(2)
+                                            >{{
+                                                formatCurrency(
+                                                    room.price_per_night ||
+                                                        room.room_type
+                                                            ?.base_price ||
+                                                        0,
+                                                )
                                             }}</span
                                         >
                                     </div>
                                     <div class="flex justify-between text-sm">
-                                        <span class="text-[#8d7a5e] font-medium"
-                                            >Phí dịch vụ</span
+                                        <span class="text-[#8d7a5e]"
+                                            >Thời gian lưu trú</span
                                         >
                                         <span class="font-bold text-[#181510]"
-                                            >${{
-                                                room.serviceFee.toFixed(2)
-                                            }}</span
-                                        >
-                                    </div>
-                                    <div class="flex justify-between text-sm">
-                                        <span class="text-[#8d7a5e] font-medium"
-                                            >Thuế và phí</span
-                                        >
-                                        <span class="font-bold text-[#181510]"
-                                            >${{ room.tax.toFixed(2) }}</span
+                                            >{{ nights }} Đêm</span
                                         >
                                     </div>
                                     <div
                                         class="flex justify-between items-center pt-4 border-t border-[#e7e2da] mt-2"
                                     >
                                         <span
-                                            class="text-lg font-bold text-[#181510]"
-                                            >Tổng cộng (USD)</span
+                                            class="text-base font-bold text-[#181510]"
+                                            >Tạm tính</span
                                         >
                                         <span
-                                            class="text-2xl font-black text-primary"
+                                            class="text-xl font-black text-primary"
+                                            >{{
+                                                formatCurrency(estimatedTotal)
+                                            }}</span
                                         >
-                                            ${{
-                                                (
-                                                    room.pricePerNight *
-                                                        room.nights +
-                                                    room.serviceFee +
-                                                    room.tax
-                                                ).toFixed(2)
-                                            }}
-                                        </span>
                                     </div>
+                                    <p
+                                        class="text-[11px] text-[#8d7a5e] text-right italic"
+                                    >
+                                        *Bạn sẽ thanh toán cọc 30% ở bước tiếp
+                                        theo.
+                                    </p>
                                 </div>
 
                                 <button
                                     type="submit"
                                     :disabled="isSubmitting"
-                                    class="w-full bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl mt-6 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    <div
-                                        v-if="isSubmitting"
-                                        class="flex items-center gap-2"
-                                    >
-                                        <svg
-                                            class="animate-spin h-5 w-5 text-white"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                class="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                stroke-width="4"
-                                                fill="none"
-                                            ></circle>
-                                            <path
-                                                class="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                        <span>Đang xử lý...</span>
-                                    </div>
-                                    <template v-else>
-                                        <span>Xác nhận đặt phòng</span>
-                                        <span class="material-symbols-outlined"
-                                            >check_circle</span
-                                        >
-                                    </template>
-                                </button>
-
-                                <p
-                                    class="text-center text-[10px] text-[#8d7a5e] mt-4 uppercase tracking-widest font-bold"
+                                    class="w-full bg-primary hover:bg-orange-600 text-white font-bold py-4 rounded-xl mt-6 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-70"
                                 >
                                     <span
-                                        class="material-symbols-outlined text-xs align-middle"
-                                        >lock</span
+                                        v-if="isSubmitting"
+                                        class="material-symbols-outlined animate-spin"
+                                        >autorenew</span
                                     >
-                                    Thanh toán bảo mật
-                                </p>
+                                    {{
+                                        isSubmitting
+                                            ? 'Đang xử lý...'
+                                            : 'Xác nhận & Đi tới Thanh toán'
+                                    }}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -471,7 +413,3 @@ const handleCompleteBooking = async () => {
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Không cần CSS thêm */
-</style>
