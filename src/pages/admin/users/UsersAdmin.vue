@@ -28,7 +28,7 @@ const fetchUsers = async () => {
     isLoading.value = true
     try {
         const response: any = await httpClient.get('/api/users/')
-        users.value = response.data || response
+        users.value = response.data.data || response
     } catch (error) {
         console.error('Lỗi khi tải danh sách người dùng:', error)
         alert('Không thể tải danh sách người dùng!')

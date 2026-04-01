@@ -13,7 +13,7 @@ const userInfo = ref<any>({})
 
 const timeLeft = ref(15 * 60)
 let timerId: ReturnType<typeof setInterval> | null = null
-let pollingId: ReturnType<typeof setInterval> | null = null // 🌟 Thêm biến để Polling
+let pollingId: ReturnType<typeof setInterval> | null = null
 
 const formattedTime = computed(() => {
     const m = Math.floor(timeLeft.value / 60)
@@ -43,7 +43,7 @@ const fetchBookingDetail = async (isBackground = false) => {
         if (currentBooking) {
             booking.value = currentBooking
 
-            // 🌟 NẾU ĐÃ THANH TOÁN XONG -> Dừng đếm ngược, dừng hỏi thăm BE
+            // Nếu đơn đã được xác nhận, dừng các vòng lặp đếm ngược và kiểm tra
             if (
                 currentBooking.status === 'CONFIRMED' ||
                 currentBooking.is_deposit_paid
@@ -72,6 +72,7 @@ onMounted(() => {
     }, 1000)
 
     // 🌟 POLLING: Cứ 3 giây lại gọi API ngầm 1 lần để check trạng thái
+    // Nếu webhook Backend nhận tiền -> Đổi status trong DB -> Hàm này sẽ thấy sự thay đổi và update UI
     pollingId = setInterval(() => {
         fetchBookingDetail(true) // true = chạy ngầm không hiện loading
     }, 3000)
@@ -93,6 +94,7 @@ const nights = computed(() => {
 const qrCodeUrl = computed(() => {
     if (!booking.value) return ''
     const amount = booking.value.deposit_amount
+    // const amount = 20000
     const message = `MACBOOKING ${booking.value.booking_id}`
     return `https://img.vietqr.io/image/${BANK_BIN}-${ACCOUNT_NO}-compact.png?amount=${amount}&addInfo=${encodeURIComponent(message)}&accountName=${encodeURIComponent(ACCOUNT_NAME)}`
 })
@@ -102,6 +104,7 @@ const formatCurrency = (val: number) =>
         style: 'currency',
         currency: 'VND',
     }).format(val || 0)
+
 const formatDate = (dateString: string) => {
     if (!dateString) return ''
     return new Intl.DateTimeFormat('vi-VN', {

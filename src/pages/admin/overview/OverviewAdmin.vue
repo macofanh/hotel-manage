@@ -4,15 +4,14 @@ import httpClient from '@/api/axiosClient'
 
 const isLoading = ref(true)
 const totalYearlyRevenue = ref(0)
+const totalRoomsCount = ref(0) // Biến lưu tổng số phòng
 
-// Dữ liệu 3 thẻ thống kê trên cùng
+// Khởi tạo giá trị mặc định chuẩn để không bị lỗi undefined
 const summary = ref({
     users: { value: 0, growth: 0, is_up: true },
-    occupancy: { value: 0, growth: 0, is_up: true },
     revenue: { value: 0, growth: 0, is_up: true },
 })
 
-// Cấu hình Biểu đồ ApexCharts
 const chartSeries = ref([
     {
         name: 'Doanh thu',
@@ -26,7 +25,7 @@ const chartOptions = ref({
         toolbar: { show: false },
         fontFamily: 'Inter, sans-serif',
     },
-    colors: ['#f48c25'], // Màu primary (Cam)
+    colors: ['#f48c25'],
     plotOptions: { bar: { borderRadius: 4, columnWidth: '40%' } },
     dataLabels: { enabled: false },
     xaxis: {
@@ -70,30 +69,45 @@ const chartOptions = ref({
     },
 })
 
-// Gọi 2 API để lấy dữ liệu
 const fetchDashboardData = async () => {
     isLoading.value = true
     try {
-        // 1. Lấy số liệu tổng quan
-        const summaryRes: any = await httpClient.get('/api/dashboard/summary')
-        summary.value = summaryRes.data || summaryRes
+        // GỌI API ĐỘC LẬP (Cái nào lỗi thì trả về null/0 để không ảnh hưởng cái khác)
+        const summaryRes = await httpClient
+            .get('/api/dashboard/summary')
+            .catch(() => ({ data: null }))
+        const usersRes = await httpClient
+            .get('/api/dashboard/total-users')
+            .catch(() => ({ data: { total_users: 0 } }))
+        const roomsRes = await httpClient
+            .get('/api/dashboard/total-rooms')
+            .catch(() => ({ data: { total_rooms: 0 } }))
+        const monthlyRevRes = await httpClient
+            .get('/api/dashboard/monthly-revenue')
+            .catch(() => ({ data: { monthly_revenue: 0 } }))
+        const chartRes = await httpClient
+            .get('/api/dashboard/revenue-chart')
+            .catch(() => ({ data: null }))
 
-        // 2. Lấy dữ liệu biểu đồ
-        const chartRes: any = await httpClient.get(
-            '/api/dashboard/revenue-chart',
-        )
+        // 1. Gán an toàn dữ liệu Summary
+        if (summaryRes.data) {
+            summary.value.users.growth = summaryRes.data.users?.growth || 0
+            summary.value.users.is_up = summaryRes.data.users?.is_up ?? true
+            summary.value.revenue.growth = summaryRes.data.revenue?.growth || 0
+            summary.value.revenue.is_up = summaryRes.data.revenue?.is_up ?? true
+        }
+
+        // 2. Gán dữ liệu thực tế từ các API đếm
+        summary.value.users.value = usersRes.data.total_users || 0
+        totalRoomsCount.value = roomsRes.data.total_rooms || 0
+        summary.value.revenue.value = monthlyRevRes.data.monthly_revenue || 0
+
+        // 3. Xử lý Biểu đồ
         const chartData = chartRes.data || chartRes
-
         if (chartData && chartData.data) {
-            // Cập nhật biểu đồ (Ép Vue phải nhận diện sự thay đổi bằng cách tạo mảng mới)
             chartSeries.value = [
-                {
-                    name: 'Doanh thu',
-                    data: [...chartData.data],
-                },
+                { name: 'Doanh thu', data: [...chartData.data] },
             ]
-
-            // 🌟 TÍNH TỔNG DOANH THU NĂM (Cộng dồn 12 tháng)
             totalYearlyRevenue.value = chartData.data.reduce(
                 (sum: number, val: number) => sum + val,
                 0,
@@ -216,7 +230,7 @@ const formatCurrency = (val: number) => {
                         <p
                             class="text-gray-500 text-sm font-bold uppercase tracking-wider"
                         >
-                            Công suất phòng
+                            Tổng số phòng
                         </p>
                         <span
                             class="material-symbols-outlined text-primary p-2 bg-orange-50 rounded-xl"
@@ -224,36 +238,11 @@ const formatCurrency = (val: number) => {
                         >
                     </div>
                     <p class="text-gray-900 tracking-tight text-3xl font-black">
-                        {{ summary.occupancy.value }}%
+                        {{ totalRoomsCount }} Phòng
                     </p>
                     <div class="flex items-center gap-1.5 mt-2">
-                        <span
-                            class="material-symbols-outlined text-lg font-bold"
-                            :class="
-                                summary.occupancy.is_up
-                                    ? 'text-green-600'
-                                    : 'text-red-500'
-                            "
-                        >
-                            {{
-                                summary.occupancy.is_up
-                                    ? 'trending_up'
-                                    : 'trending_down'
-                            }}
-                        </span>
-                        <p
-                            class="text-sm font-bold"
-                            :class="
-                                summary.occupancy.is_up
-                                    ? 'text-green-600'
-                                    : 'text-red-500'
-                            "
-                        >
-                            {{ summary.occupancy.is_up ? '+' : ''
-                            }}{{ summary.occupancy.growth }}%
-                        </p>
                         <p class="text-gray-400 text-xs font-medium">
-                            so với tháng trước
+                            Đang có trong hệ thống
                         </p>
                     </div>
                 </div>
@@ -265,7 +254,7 @@ const formatCurrency = (val: number) => {
                         <p
                             class="text-gray-500 text-sm font-bold uppercase tracking-wider"
                         >
-                            Doanh thu tháng
+                            Doanh thu tháng {{ new Date().getMonth() + 1 }}
                         </p>
                         <span
                             class="material-symbols-outlined text-primary p-2 bg-orange-50 rounded-xl"
@@ -322,7 +311,6 @@ const formatCurrency = (val: number) => {
                             Theo dõi hiệu suất kinh doanh trong năm nay
                         </p>
                     </div>
-
                     <div
                         class="text-right bg-orange-50 px-4 py-2 rounded-xl border border-orange-100"
                     >
@@ -336,7 +324,6 @@ const formatCurrency = (val: number) => {
                         </p>
                     </div>
                 </div>
-
                 <div class="w-full h-80 pt-4">
                     <apexchart
                         type="bar"
